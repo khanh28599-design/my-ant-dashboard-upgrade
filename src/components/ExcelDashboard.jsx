@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Upload, Button, Table, Row, Col, message, Select } from "antd";
+import { Upload, Button, Table, message, Select } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import {
   BarChart,
@@ -57,8 +57,18 @@ export default function ExcelDashboard() {
       setColumns([
         { title: "Người tạo", dataIndex: "Người tạo", key: "Người tạo" },
         { title: "Ngành hàng", dataIndex: "Ngành hàng", key: "Ngành hàng" },
-        { title: "Phải thu", dataIndex: "Phải thu", key: "Phải thu", sorter: (a, b) => a["Phải thu"] - b["Phải thu"] },
-        { title: "Số lượng", dataIndex: "Số lượng", key: "Số lượng", sorter: (a, b) => a["Số lượng"] - b["Số lượng"] },
+        {
+          title: "Phải thu",
+          dataIndex: "Phải thu",
+          key: "Phải thu",
+          sorter: (a, b) => a["Phải thu"] - b["Phải thu"],
+        },
+        {
+          title: "Số lượng",
+          dataIndex: "Số lượng",
+          key: "Số lượng",
+          sorter: (a, b) => a["Số lượng"] - b["Số lượng"],
+        },
       ]);
 
       // Mặc định chọn tất cả filter
@@ -74,11 +84,15 @@ export default function ExcelDashboard() {
   };
 
   // Table dữ liệu với filter riêng
-  const filteredTable = useMemo(() => {
-    return data.filter(
-      (row) => tableCreatorFilter.includes(row["Người tạo"]) && tableCategoryFilter.includes(row["Ngành hàng"])
-    );
-  }, [data, tableCreatorFilter, tableCategoryFilter]);
+  const filteredTable = useMemo(
+    () =>
+      data.filter(
+        (row) =>
+          tableCreatorFilter.includes(row["Người tạo"]) &&
+          tableCategoryFilter.includes(row["Ngành hàng"])
+      ),
+    [data, tableCreatorFilter, tableCategoryFilter]
+  );
 
   // Pie chart: tổng doanh thu theo Người tạo với filter riêng
   const pieData = useMemo(() => {
@@ -90,8 +104,17 @@ export default function ExcelDashboard() {
         if (!grouped[creator]) grouped[creator] = 0;
         grouped[creator] += row["Phải thu"];
       });
-    return Object.keys(grouped).map((key) => ({ name: key, "Doanh thu": grouped[key] }));
+    return Object.keys(grouped).map((key) => ({
+      name: key,
+      DoanhThu: grouped[key],
+    }));
   }, [data, pieCreatorFilter]);
+
+  // Chuẩn hóa lại key để dùng cho PieChart (dataKey không có dấu cách)
+  const normalizedPieData = pieData.map((item) => ({
+    ...item,
+    "Doanh thu": item.DoanhThu,
+  }));
 
   // Bar chart: doanh thu & số lượng theo Ngành hàng với filter riêng
   const barData = useMemo(() => {
@@ -100,11 +123,12 @@ export default function ExcelDashboard() {
       .filter((row) => barCategoryFilter.includes(row["Ngành hàng"]))
       .forEach((row) => {
         const category = row["Ngành hàng"];
-        if (!grouped[category]) grouped[category] = { "Doanh thu": 0, "Số lượng": 0 };
+        if (!grouped[category])
+          grouped[category] = { name: category, "Doanh thu": 0, "Số lượng": 0 };
         grouped[category]["Doanh thu"] += row["Phải thu"];
         grouped[category]["Số lượng"] += row["Số lượng"];
       });
-    return Object.keys(grouped).map((key) => ({ name: key, ...grouped[key] }));
+    return Object.values(grouped);
   }, [data, barCategoryFilter]);
 
   const allCreators = Array.from(new Set(data.map((r) => r["Người tạo"])));
@@ -116,68 +140,107 @@ export default function ExcelDashboard() {
         <Button icon={<UploadOutlined />}>Chọn file Excel</Button>
       </Upload>
 
-      {/* Filter Table */}
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={12}>
-          <Select
-            mode="multiple"
-            allowClear
-            placeholder="Chọn Người tạo cho Table"
-            style={{ width: "100%" }}
-            value={tableCreatorFilter}
-            onChange={setTableCreatorFilter}
-          >
-            {allCreators.map((c) => (
-              <Option key={c} value={c}>
-                {c}
-              </Option>
-            ))}
-          </Select>
-        </Col>
-        <Col span={12}>
-          <Select
-            mode="multiple"
-            allowClear
-            placeholder="Chọn Ngành hàng cho Table"
-            style={{ width: "100%" }}
-            value={tableCategoryFilter}
-            onChange={setTableCategoryFilter}
-          >
-            {allCategories.map((c) => (
-              <Option key={c} value={c}>
-                {c}
-              </Option>
-            ))}
-          </Select>
-        </Col>
-      </Row>
+      {/* THANH FILTER CHO TABLE */}
+      <div
+        style={{
+          marginTop: 16,
+          padding: 8,
+          border: "1px solid #f0f0f0",
+          borderRadius: 8,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          background: "#fafafa",
+        }}
+      >
+        <span style={{ fontWeight: 500 }}>Filter Table:</span>
 
+        <span>Người tạo:</span>
+        <Select
+          mode="multiple"
+          allowClear
+          size="small"
+          placeholder="Chọn"
+          style={{ width: 180 }}
+          value={tableCreatorFilter}
+          onChange={setTableCreatorFilter}
+          maxTagCount="responsive"
+        >
+          {allCreators.map((c) => (
+            <Option key={c} value={c}>
+              {c}
+            </Option>
+          ))}
+        </Select>
+
+        <span>Ngành hàng:</span>
+        <Select
+          mode="multiple"
+          allowClear
+          size="small"
+          placeholder="Chọn"
+          style={{ width: 180 }}
+          value={tableCategoryFilter}
+          onChange={setTableCategoryFilter}
+          maxTagCount="responsive"
+        >
+          {allCategories.map((c) => (
+            <Option key={c} value={c}>
+              {c}
+            </Option>
+          ))}
+        </Select>
+      </div>
+
+      {/* TABLE */}
       <Table
         columns={columns}
         dataSource={filteredTable.map((row, index) => ({ ...row, key: index }))}
         style={{ marginTop: 16 }}
+        size="small"
       />
 
-      {/* Filter Pie Chart */}
-      <h3 style={{ marginTop: 24 }}>Biểu đồ tròn: Doanh thu theo Người tạo</h3>
-      <Select
-        mode="multiple"
-        allowClear
-        placeholder="Chọn Người tạo cho Pie Chart"
-        style={{ width: "50%", marginBottom: 16 }}
-        value={pieCreatorFilter}
-        onChange={setPieCreatorFilter}
+      {/* THANH FILTER CHO PIE CHART */}
+      <div
+        style={{
+          marginTop: 24,
+          padding: 8,
+          border: "1px solid #f0f0f0",
+          borderRadius: 8,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          background: "#fafafa",
+        }}
       >
-        {allCreators.map((c) => (
-          <Option key={c} value={c}>
-            {c}
-          </Option>
-        ))}
-      </Select>
+        <span style={{ fontWeight: 500 }}>Filter Pie Chart:</span>
+
+        <span>Người tạo:</span>
+        <Select
+          mode="multiple"
+          allowClear
+          size="small"
+          placeholder="Chọn"
+          style={{ width: 220 }}
+          value={pieCreatorFilter}
+          onChange={setPieCreatorFilter}
+          maxTagCount="responsive"
+        >
+          {allCreators.map((c) => (
+            <Option key={c} value={c}>
+              {c}
+            </Option>
+          ))}
+        </Select>
+      </div>
+
+      <h3 style={{ marginTop: 12 }}>Biểu đồ tròn: Doanh thu theo Người tạo</h3>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
-            data={pieData}
+            data={normalizedPieData}
             dataKey="Doanh thu"
             nameKey="name"
             cx="50%"
@@ -185,7 +248,7 @@ export default function ExcelDashboard() {
             outerRadius={100}
             label
           >
-            {pieData.map((entry, index) => (
+            {normalizedPieData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
@@ -194,22 +257,44 @@ export default function ExcelDashboard() {
         </PieChart>
       </ResponsiveContainer>
 
-      {/* Filter Bar Chart */}
-      <h3 style={{ marginTop: 24 }}>Biểu đồ cột: Doanh thu & Số lượng theo Ngành hàng</h3>
-      <Select
-        mode="multiple"
-        allowClear
-        placeholder="Chọn Ngành hàng cho Bar Chart"
-        style={{ width: "50%", marginBottom: 16 }}
-        value={barCategoryFilter}
-        onChange={setBarCategoryFilter}
+      {/* THANH FILTER CHO BAR CHART */}
+      <div
+        style={{
+          marginTop: 24,
+          padding: 8,
+          border: "1px solid #f0f0f0",
+          borderRadius: 8,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          background: "#fafafa",
+        }}
       >
-        {allCategories.map((c) => (
-          <Option key={c} value={c}>
-            {c}
-          </Option>
-        ))}
-      </Select>
+        <span style={{ fontWeight: 500 }}>Filter Bar Chart:</span>
+
+        <span>Ngành hàng:</span>
+        <Select
+          mode="multiple"
+          allowClear
+          size="small"
+          placeholder="Chọn"
+          style={{ width: 220 }}
+          value={barCategoryFilter}
+          onChange={setBarCategoryFilter}
+          maxTagCount="responsive"
+        >
+          {allCategories.map((c) => (
+            <Option key={c} value={c}>
+              {c}
+            </Option>
+          ))}
+        </Select>
+      </div>
+
+      <h3 style={{ marginTop: 12 }}>
+        Biểu đồ cột: Doanh thu &amp; Số lượng theo Ngành hàng
+      </h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={barData}>
           <XAxis dataKey="name" />
