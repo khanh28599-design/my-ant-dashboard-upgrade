@@ -1,0 +1,17 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f0f2f5;
+}
+
+.ant-layout {
+  transition: background 0.3s;
+}
+
+@media (max-width: 768px) {
+  .ant-layout-sider {
+    position: absolute;
+    z-index: 1000;
+    height: 100vh;
+  }
+}
