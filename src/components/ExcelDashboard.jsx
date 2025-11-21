@@ -22,7 +22,7 @@ const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
 // ==========================================
-// STYLES & COLORS (CẤU HÌNH GIAO DIỆN)
+// STYLES & COLORS (GIAO DIỆN)
 // ==========================================
 const cardStyle = {
   borderRadius: 12,
@@ -38,7 +38,6 @@ const gradientText = {
   fontWeight: 800
 };
 
-// Hàm format tiền tệ
 const formatMoneyShort = (amount) => {
   if (!amount) return "0";
   if (amount >= 1000000000) return (amount / 1000000000).toFixed(1) + " Tỷ";
@@ -48,24 +47,59 @@ const formatMoneyShort = (amount) => {
 };
 
 // ==========================================
-// 1. CẤU HÌNH LOGIC NGHIỆP VỤ
+// 1. CẤU HÌNH LOGIC NGHIỆP VỤ (CẬP NHẬT HỆ SỐ MỚI)
 // ==========================================
-const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664"];
+
+// Danh sách ID cho phép (cập nhật thêm Xe đạp, v.v.)
+const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664", "1634"];
 
 const isAllowedProduct = (industryStr, groupStr) => {
     const check = (str) => str && ALLOWED_IDS.some(id => str.toString().startsWith(id));
     return check(industryStr) || check(groupStr);
 };
 
+// --- HÀM LẤY HỆ SỐ QUI ĐỔI (CẬP NHẬT MỚI) ---
 const getConversionCoefficient = (industryStr, groupStr) => {
-    const id = groupStr ? groupStr.toString().split(" - ")[0] : (industryStr ? industryStr.toString().split(" - ")[0] : "");
-    if (id === "664") return 5.45;
-    if (id === "164") return 4.18; 
-    if (["184", "1394", "16"].includes(id)) return 3.37;
-    if (["1274", "23"].includes(id)) return 3.00;
-    if (id === "1034") return 1.92;
-    if (["484", "1214", "1116"].includes(id)) return 1.85;
-    if (id === "304") return 1.0; 
+    // Lấy ID và Tên để so sánh (chuyển về chữ thường)
+    const iStr = industryStr ? industryStr.toString().toLowerCase() : "";
+    const gStr = groupStr ? groupStr.toString().toLowerCase() : "";
+    
+    // Lấy ID đầu chuỗi (VD: "664 - Sim" -> "664")
+    const iID = industryStr ? industryStr.toString().split(" - ")[0] : "";
+    const gID = groupStr ? groupStr.toString().split(" - ")[0] : "";
+
+    // 1. SIM SỐ: 545% (5.45)
+    if (iID === "664" || iStr.includes("sim")) return 5.45;
+
+    // 2. BẢO HIỂM: 418% (4.18)
+    // Thường nằm trong VAS (164) hoặc tên có chữ Bảo hiểm
+    if (iID === "164" || iStr.includes("bảo hiểm") || gStr.includes("bảo hiểm")) return 4.18;
+
+    // 3. PHỤ KIỆN: 337% (3.37)
+    if (["184", "1394", "16", "38"].includes(iID) || iStr.includes("phụ kiện")) return 3.37;
+
+    // 4. ĐỒNG HỒ THỜI TRANG & WEARABLE: 300% (3.0)
+    if (["1274", "23"].includes(iID) || iStr.includes("đồng hồ") || iStr.includes("wearable")) return 3.00;
+
+    // 5. GIA DỤNG KHÔNG ĐIỆN: 192% (1.92)
+    // Thường là ID 1034 (Dụng cụ nhà bếp)
+    if (iID === "1034" || iStr.includes("không điện")) return 1.92;
+
+    // 6. GIA DỤNG CÓ ĐIỆN: 185% (1.85)
+    // Thường là 484, 1214, 1116
+    if (["484", "1214", "1116"].includes(iID) || iStr.includes("gia dụng")) return 1.85;
+
+    // 7. LOA KARAOKE: 129% (1.29)
+    // Thường nằm trong Điện tử (304), cần check tên Nhóm hàng
+    if (gStr.includes("loa") || gStr.includes("karaoke")) return 1.29;
+
+    // 8. XE ĐẠP: 112% (1.12)
+    if (iStr.includes("xe đạp") || gStr.includes("xe đạp")) return 1.12;
+
+    // 9. DÀN MÁY: 102% (1.02)
+    if (gStr.includes("dàn máy") || gStr.includes("âm thanh")) return 1.02;
+
+    // 10. MẶC ĐỊNH (Điện thoại, Laptop, Tivi...): 100% (1.0)
     return 1.0;
 };
 
@@ -148,31 +182,38 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
 }
 
 // ==========================================
-// 3. CÁC COMPONENT HIỂN THỊ (NÂNG CẤP VISUAL)
+// 3. CÁC COMPONENT HIỂN THỊ
 // ==========================================
 
 function OverviewSection({ stats }) {
   const effColor = stats.conversionEfficiency >= 0 ? "#52c41a" : "#f5222d";
   const EffIcon = stats.conversionEfficiency >= 0 ? ArrowUpOutlined : ArrowDownOutlined;
 
-  // Cấu hình Card đẹp hơn với Gradient
   const cards = [
     {
-      title: "TỔNG DOANH THU",
+      title: "TỔNG DOANH THU THỰC",
       value: formatMoneyShort(stats.totalRevenue),
-      sub: `Tổng số lượng: ${stats.totalQuantity}`,
+      sub: `Số lượng: ${stats.totalQuantity}`,
       icon: <FundOutlined style={{ fontSize: 24, color: "#fff" }} />,
-      background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)", // Xanh dương
+      background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)",
       shadow: "0 10px 20px -10px rgba(60, 140, 231, 0.5)"
     },
     {
-      title: "HIỆU QUẢ QĐ",
+      title: "TỔNG DOANH THU QUY ĐỔI",
+      value: formatMoneyShort(stats.totalConvertedRevenue),
+      sub: "DTQĐ = DT Thực * Hệ số",
+      icon: <RiseOutlined style={{ fontSize: 24, color: "#fff" }} />,
+      background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)", 
+      shadow: "0 10px 20px -10px rgba(102, 126, 234, 0.5)"
+    },
+    {
+      title: "HIỆU QUẢ QĐ (TỈ TRỌNG)",
       value: `${stats.conversionEfficiency > 0 ? '+' : ''}${stats.conversionEfficiency}%`,
       sub: "(DTQĐ - DT Thực) / DT Thực",
-      icon: <RiseOutlined style={{ fontSize: 24, color: "#fff" }} />,
+      icon: <EffIcon style={{ fontSize: 24, color: "#fff" }} />,
       background: stats.conversionEfficiency >= 0 
-          ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)" // Xanh lá
-          : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)", // Đỏ
+          ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)"
+          : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)",
       shadow: "0 10px 20px -10px rgba(17, 153, 142, 0.5)"
     },
     {
@@ -180,16 +221,8 @@ function OverviewSection({ stats }) {
       value: stats.installmentRate + "%",
       sub: `SL HĐ Trả góp: ${stats.installmentCount}`,
       icon: <PieChartOutlined style={{ fontSize: 24, color: "#fff" }} />,
-      background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)", // Cam hồng
+      background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)",
       shadow: "0 10px 20px -10px rgba(242, 112, 156, 0.5)"
-    },
-    {
-      title: "DOANH THU QĐ CHỜ XUẤT",
-      value: formatMoneyShort(stats.pendingConvertedRevenue),
-      sub: `Tích lũy chờ duyệt`,
-      icon: <TableOutlined style={{ fontSize: 24, color: "#fff" }} />,
-      background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)", // Tím
-      shadow: "0 10px 20px -10px rgba(102, 126, 234, 0.5)"
     }
   ];
 
@@ -201,7 +234,7 @@ function OverviewSection({ stats }) {
             <Row align="middle" justify="space-between">
                 <Col>
                     <div style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600, fontSize: 12, textTransform: "uppercase", marginBottom: 4 }}>{item.title}</div>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: "#fff" }}>{item.value}</div>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: "#fff" }}>{item.value}</div>
                     <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{item.sub}</div>
                 </Col>
                 <Col>
@@ -219,8 +252,6 @@ function OverviewSection({ stats }) {
 
 function CategoryChartBar({ industryData, totalRevenue }) {
     const parentData = industryData.filter(i => !i.isChild && i.doanhThu > 0).sort((a, b) => b.doanhThu - a.doanhThu);
-    
-    // Bảng màu cầu vồng
     const colors = [
         "linear-gradient(to right, #2980b9, #6dd5fa, #ffffff)", 
         "linear-gradient(to right, #11998e, #38ef7d)", 
@@ -302,8 +333,8 @@ function TopStaffRanking({ staffData, totalRevenue }) {
         columns={[
           {title: "#", render: (text, record, index) => index + 1, width: 50, align: 'center'},
           {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: "#1890ff"}}>{txt}</b>},
-          {title: "Doanh Thu", dataIndex: "doanhThu", key: "doanhThu", render: val => formatMoneyShort(val), align: 'right', sorter: (a, b) => a.doanhThu - b.doanhThu},
-          {title: "DTQĐ", dataIndex: "dtqd", key: "dtqd", render: val => <b>{formatMoneyShort(val)}</b>, align: 'right', sorter: (a, b) => a.dtqd - b.dtqd},
+          {title: "Doanh Thu Thực", dataIndex: "doanhThu", key: "doanhThu", render: val => formatMoneyShort(val), align: 'right', sorter: (a, b) => a.doanhThu - b.doanhThu},
+          {title: "Doanh Thu QĐ", dataIndex: "dtqd", key: "dtqd", render: val => <b style={{color: "#722ed1"}}>{formatMoneyShort(val)}</b>, align: 'right', sorter: (a, b) => a.dtqd - b.dtqd},
           {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center',
              render: val => <Tag color={val >= 0 ? "success" : "error"}>{val > 0 ? '+' : ''}{val}%</Tag>,
              sorter: (a, b) => a.efficiency - b.efficiency
@@ -343,16 +374,15 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
         { title: "SỐ LƯỢNG", dataIndex: "soLuong", key: "soLuong", align: 'center', 
           render: (val, record) => record.name === "TỔNG CỘNG" ? <b>{val}</b> : val 
         },
-        { title: "DOANH THU", dataIndex: "doanhThu", key: "doanhThu", align: 'right',
+        { title: "DOANH THU THỰC", dataIndex: "doanhThu", key: "doanhThu", align: 'right',
           render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "red", fontSize: 15}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
         },
-        { title: "DT QUY ĐỔI", dataIndex: "dtqd", key: "dtqd", align: 'right',
+        { title: "DOANH THU QĐ", dataIndex: "dtqd", key: "dtqd", align: 'right',
           render: (val, record) => <b style={{color: "#1890ff"}}>{formatMoneyShort(val)}</b>
         },
         { title: "HỆ SỐ", dataIndex: "coefficient", key: "coefficient", align: 'center', 
           render: val => val ? <Tag color="purple">{val}</Tag> : "" 
         },
-        // CỘT ĐƠN GIÁ (MỚI)
         { title: "ĐƠN GIÁ", key: "unitPrice", align: 'right',
           render: (_, record) => {
              if(record.name === "TỔNG CỘNG") return "";
@@ -363,6 +393,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
         { title: "HIỆU QUẢ", key: "efficiency", align: 'right',
           render: (_, record) => {
              if(record.name === "TỔNG CỘNG") return "";
+             // (DTQD - DT) / DT
              const eff = record.doanhThu > 0 ? ((record.dtqd - record.doanhThu)/record.doanhThu)*100 : 0;
              const color = eff >= 0 ? "#52c41a" : "#f5222d";
              return <span style={{color: color, fontWeight: 'bold'}}>{eff > 0 ? '+' : ''}{eff.toFixed(1)}%</span>
@@ -485,6 +516,7 @@ export default function ExcelDashboard() {
 
             const rev = item.doanhThu;
             const qty = item.soLuong;
+            // CÔNG THỨC QUAN TRỌNG: TÍNH DTQD DỰA TRÊN HỆ SỐ MỚI
             const coefficient = getConversionCoefficient(item.nganhHang, item.nhomHang);
             const convertedRev = rev * coefficient;
 
@@ -582,7 +614,6 @@ export default function ExcelDashboard() {
           <FilterPanel creators={uniqueCreators} statuses={uniqueStatuses} filters={filters} setFilters={setFilters} onReset={resetFilters} />
           <OverviewSection stats={stats} />
           
-          {/* BỐ CỤC MỚI: 2 CỘT CHO BIỂU ĐỒ */}
           <Row gutter={20} style={{marginBottom: 20}}>
              <Col span={16}>
                  <Tabs defaultActiveKey="1" type="card" size="large" style={{background: "#fff", padding: 16, borderRadius: 12, ...cardStyle}}>
