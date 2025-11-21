@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { Row, Col, Card, Button, Select, DatePicker, Input, Table, Tabs, Tag, Space, Spin, message, Progress, Popover, Checkbox, Divider, Tooltip } from "antd";
 import {
@@ -19,16 +19,19 @@ import {
   SettingOutlined,
   DollarOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined
+  CloseCircleOutlined,
+  CameraOutlined,
+  InfoCircleOutlined
 } from "@ant-design/icons";
 import moment from "moment";
+import html2canvas from 'html2canvas';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
 // ==========================================
-// STYLES & HELPERS
+// STYLES & HELPERS (GIỮ NGUYÊN)
 // ==========================================
 const cardStyle = {
   borderRadius: 12,
@@ -46,15 +49,21 @@ const gradientText = {
 
 const formatMoneyShort = (amount) => {
   if (!amount) return "0";
-  if (amount >= 1000000000) return (amount / 1000000000).toFixed(1) + " Tỷ";
-  if (amount >= 1000000) return (amount / 1000000).toFixed(1) + " Tr";
-  if (amount >= 1000) return (amount / 1000).toFixed(0) + " k";
+  // Xử lý tiền tệ lớn, đảm bảo tính toán luôn trên giá trị tuyệt đối, sau đó áp dụng dấu.
+  const absAmount = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+
+  if (absAmount >= 1000000000) return sign + (absAmount / 1000000000).toFixed(1) + " Tỷ";
+  if (absAmount >= 1000000) return sign + (absAmount / 1000000).toFixed(1) + " Tr";
+  if (absAmount >= 1000) return sign + (absAmount / 1000).toFixed(0) + " k";
   return amount.toLocaleString('vi-VN');
 };
 
 // ==========================================
-// 1. CẤU HÌNH WHITELIST & HỆ SỐ
+// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH (GIỮ NGUYÊN)
 // ==========================================
+
+// Whitelist IDs (Giữ nguyên)
 const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664"];
 
 const isAllowedProduct = (industryStr, groupStr) => {
@@ -90,8 +99,35 @@ const getConversionCoefficient = (industryStr, groupStr) => {
     return 1.0;
 };
 
+// HÀM CHỤP HÌNH TABLE (Giữ nguyên)
+const captureTable = async (elementId, filename) => {
+    const input = document.getElementById(elementId);
+    if (!input) {
+        message.error("Không tìm thấy bảng để chụp hình.");
+        return;
+    }
+
+    try {
+        const canvas = await html2canvas(input, {
+            scale: 2, // Tăng độ phân giải
+            useCORS: true, 
+        });
+
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        message.success(`Đã chụp và tải xuống: ${filename}`);
+    } catch (error) {
+        console.error("Lỗi khi chụp hình:", error);
+        message.error("Lỗi khi chụp hình, vui lòng thử lại.");
+    }
+};
+
 // ==========================================
-// 2. COMPONENT BỘ LỌC TỔNG
+// 1. COMPONENT BỘ LỌC TỔNG (GIỮ NGUYÊN)
 // ==========================================
 
 function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
@@ -153,13 +189,6 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
             format="DD/MM/YYYY"
           /> 
         </Col>
-        <Col span={4}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Tìm kiếm</b></div>
-          <Input 
-            placeholder="Mã ĐH, Tên SP..." size="middle" prefix={<SearchOutlined />}
-            value={filters.keyword} onChange={(e) => handleChange('keyword', e.target.value)}
-          />
-        </Col>
         <Col span={2}>
           <Button type="dashed" icon={<ReloadOutlined />} size="middle" style={{marginTop: 24, width: "100%"}} onClick={onReset}>Xóa</Button>
         </Col>
@@ -169,11 +198,10 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
 }
 
 // ==========================================
-// 3. CÁC COMPONENT HIỂN THỊ
+// 2. CÁC COMPONENT HIỂN THỊ OVERVIEW (GIỮ NGUYÊN)
 // ==========================================
 
 function OverviewSection({ stats }) {
-  const effColor = stats.conversionEfficiency >= 0 ? "#52c41a" : "#f5222d";
   const EffIcon = stats.conversionEfficiency >= 0 ? ArrowUpOutlined : ArrowDownOutlined;
 
   const cards = [
@@ -255,7 +283,7 @@ function StaffHorizontalChart({ staffData }) {
 }
 
 // ==========================================
-// 4. CÁC BẢNG CHI TIẾT
+// 3. CÁC BẢNG CHI TIẾT (GIỮ NGUYÊN)
 // ==========================================
 
 function TopStaffRanking({ staffData, totalRevenue }) {
@@ -265,14 +293,16 @@ function TopStaffRanking({ staffData, totalRevenue }) {
       <Table
         dataSource={staffData}
         pagination={{ pageSize: 10 }}
-        size="middle"
+        size="small"
         rowKey="key"
+        scroll={{ x: 'max-content' }} // Tối ưu hiển thị ngang
+        style={{ fontSize: '12px' }} // Thu nhỏ chữ
         columns={[
           {title: "#", render: (text, record, index) => index + 1, width: 50, align: 'center'},
-          {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: "#1890ff"}}>{txt}</b>},
+          {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: "#1890ff", fontSize: 12}}>{txt}</b>},
           {title: "Doanh Thu Thực", dataIndex: "doanhThu", key: "doanhThu", render: val => formatMoneyShort(val), align: 'right', sorter: (a, b) => a.doanhThu - b.doanhThu},
           {title: "Doanh Thu QĐ", dataIndex: "dtqd", key: "dtqd", render: val => <b style={{color: "#722ed1"}}>{formatMoneyShort(val)}</b>, align: 'right', sorter: (a, b) => a.dtqd - b.dtqd},
-          {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center', render: val => <Tag color={val >= 0 ? "success" : "error"}>{val > 0 ? '+' : ''}{val}%</Tag>, sorter: (a, b) => a.efficiency - b.efficiency},
+          {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center', render: val => <Tag color={val >= 0 ? "success" : "error"}>{val > 0 ? '+' : ''}{val.toFixed(2)}%</Tag>, sorter: (a, b) => a.efficiency - b.efficiency},
           {title: "% Mục Tiêu", key: "target", render: (_, record) => <Progress percent={personalTarget > 0 ? (record.doanhThu / personalTarget) * 100 : 0} size="small" steps={5} strokeColor="#52c41a" showInfo={false} />, align: 'center'},
           {title: "Bảo Hiểm", dataIndex: "bhRevenue", key: "bhRevenue", render: val => formatMoneyShort(val), align: 'right'},
         ]}
@@ -283,10 +313,9 @@ function TopStaffRanking({ staffData, totalRevenue }) {
 
 function DetailIndustryTable({ industryData, totalRevenue, creators, filters, setFilters }) {
     const [searchText, setSearchText] = useState('');
-    const [searchedColumn, setSearchedColumn] = useState('');
     const searchInput = useRef(null);
     const [selectedIndustries, setSelectedIndustries] = useState([]);
-    const defaultCheckedList = ['name', 'soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
+    const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
     const [checkedList, setCheckedList] = useState(defaultCheckedList);
     
     const industryOptions = useMemo(() => {
@@ -301,12 +330,12 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
                     placeholder={`Tìm tên...`}
                     value={selectedKeys[0]}
                     onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-                    onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
+                    onPressEnter={() => confirm()}
                     style={{ marginBottom: 8, display: 'block' }}
                 />
                 <Space>
-                    <Button type="primary" onClick={() => handleSearch(selectedKeys, confirm, dataIndex)} icon={<SearchOutlined />} size="small" style={{ width: 90 }}>Tìm</Button>
-                    <Button onClick={() => handleReset(clearFilters)} size="small" style={{ width: 90 }}>Xóa</Button>
+                    <Button type="primary" onClick={() => confirm()} icon={<SearchOutlined />} size="small" style={{ width: 90 }}>Tìm</Button>
+                    <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>Xóa</Button>
                 </Space>
             </div>
         ),
@@ -314,9 +343,6 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
         onFilter: (value, record) => record[dataIndex] ? record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()) : '',
         onFilterDropdownVisibleChange: visible => { if (visible) setTimeout(() => searchInput.current.select(), 100); },
     });
-
-    const handleSearch = (selectedKeys, confirm, dataIndex) => { confirm(); setSearchText(selectedKeys[0]); setSearchedColumn(dataIndex); };
-    const handleReset = (clearFilters) => { clearFilters(); setSearchText(''); };
 
     const filteredIndustryData = useMemo(() => {
         if (selectedIndustries.length === 0) return industryData;
@@ -353,7 +379,7 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
             filters: industryFilters,
             filterSearch: true, 
             onFilter: (value, record) => record.name.indexOf(value) === 0,
-            render: (text, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 15}}>{text}</b> : <span style={{fontWeight: record.isChild ? 400 : 600, paddingLeft: record.isChild ? 20 : 0}}>{text}</span>
+            render: (text, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 13}}>{text}</b> : <span style={{fontWeight: record.isChild ? 400 : 600, paddingLeft: record.isChild ? 20 : 0}}>{text}</span>
         },
         { 
             title: "SỐ LƯỢNG", dataIndex: "soLuong", key: "soLuong", align: 'center', width: 100,
@@ -363,7 +389,7 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
         { 
             title: "DOANH THU THỰC", dataIndex: "doanhThu", key: "doanhThu", align: 'right', width: 150,
             sorter: (a, b) => a.doanhThu - b.doanhThu,
-            render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 15}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
+            render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 13}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
         },
         { 
             title: "DOANH THU QĐ", dataIndex: "dtqd", key: "dtqd", align: 'right', width: 150,
@@ -410,7 +436,7 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
         }
     ];
 
-    const visibleColumns = allColumns.filter(col => checkedList.includes(col.key));
+    const visibleColumns = allColumns.filter(col => col.key === 'name' || checkedList.includes(col.key));
 
     const content = (
         <Checkbox.Group 
@@ -445,28 +471,30 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
             </div>
         </div>
         <Table 
-            columns={visibleColumns} dataSource={dataSource} scroll={{x: 1200, y: 500}} 
-            pagination={false} size="middle" rowKey="key" bordered expandable={{defaultExpandAllRows: false}}
+            columns={visibleColumns} 
+            dataSource={dataSource} 
+            scroll={{x: 'max-content', y: 500}} // Tối ưu hiển thị ngang
+            pagination={false} 
+            size="small" 
+            rowKey="key" 
+            bordered 
+            expandable={{defaultExpandAllRows: false}}
+            style={{ fontSize: '12px' }} // Thu nhỏ chữ
         />
     </Card>
   );
 }
 
-// ==========================================
-// 5. COMPONENT MỚI: BẢNG ĐƠN GIÁ TB (UPDATED)
-// ==========================================
 function StaffAvgPriceTable({ rawData }) {
-  // Cấu hình Target cho từng nhóm hàng
   const targetGroups = [
     { id: "1094", name: "Tivi LED (1094)", target: 9000000 },
     { id: "1097", name: "Tủ lạnh (1097)", target: 9000000 },
     { id: "1098", name: "Máy lạnh (1098)", target: 9000000 },
     { id: "1099", name: "Máy giặt (1099)", target: 9000000 },
     { id: "1491", name: "Smartphone (1491)", target: 7000000 },
-    { id: "1274", name: "Laptop (1274)", target: 14000000 }, // Added Laptop
+    { id: "1274", name: "Laptop (1274)", target: 14000000 },
   ];
 
-  // State cho bộ lọc nhóm hàng
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const dataSource = useMemo(() => {
@@ -503,7 +531,6 @@ function StaffAvgPriceTable({ rawData }) {
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [rawData]);
 
-  // Lọc các cột dựa trên selectedGroups
   const visibleGroups = selectedGroups.length > 0 
     ? targetGroups.filter(g => selectedGroups.includes(g.id)) 
     : targetGroups;
@@ -511,7 +538,7 @@ function StaffAvgPriceTable({ rawData }) {
   const columns = [
     {
       title: "Nhân Viên", dataIndex: "name", key: "name", fixed: "left", width: 180,
-      render: text => <b style={{ color: "#1890ff" }}>{text}</b>
+      render: text => <b style={{ color: "#1890ff", fontSize: 12 }}>{text}</b>
     },
     ...visibleGroups.map(group => ({
       title: (
@@ -525,13 +552,12 @@ function StaffAvgPriceTable({ rawData }) {
       render: (price, record) => {
         if (!price || price === 0) return <span style={{ color: "#eee" }}>-</span>;
         
-        // Logic tô màu
         const isPass = price >= group.target;
         const color = isPass ? "#52c41a" : "#f5222d";
         
         return (
           <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
-            <span style={{ color: color, fontWeight: 700, fontSize: 14 }}>
+            <span style={{ color: color, fontWeight: 700, fontSize: 13 }}>
                 {formatMoneyShort(price)}
             </span>
             <span style={{ fontSize: 11, color: "#999", fontStyle: 'italic' }}>SL: {record[`${group.id}_qty`]}</span>
@@ -544,9 +570,7 @@ function StaffAvgPriceTable({ rawData }) {
   return (
     <Card style={cardStyle} bodyStyle={{paddingTop: 10}}>
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
-          <div style={{fontSize: 16, fontWeight: 'bold', color: '#1890ff'}}><DollarOutlined /> Đơn Giá Trung Bình (Doanh Thu / Số Lượng)</div>
-          
-          {/* BỘ LỌC NHÓM HÀNG RIÊNG */}
+          <div style={{fontSize: 16, fontWeight: 'bold', color: '#1890ff'}}><DollarOutlined /> Đơn Giá Trung Bình</div>
           <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
               <FilterFilled style={{color: '#888'}} />
               <span style={{fontSize: 13, color: '#555'}}>Lọc nhóm:</span>
@@ -568,25 +592,282 @@ function StaffAvgPriceTable({ rawData }) {
           <span><Tag color="#f5222d">Đỏ</Tag> Thấp hơn mục tiêu</span>
       </div>
       <Table
-        dataSource={dataSource} columns={columns} scroll={{ x: 1000, y: 500 }}
-        pagination={{ pageSize: 10 }} bordered size="small"
+        dataSource={dataSource} 
+        columns={columns} 
+        scroll={{ x: 'max-content', y: 500 }} // Tối ưu hiển thị ngang
+        pagination={{ pageSize: 10 }} 
+        bordered 
+        size="small" 
+        style={{ fontSize: '12px' }} // Thu nhỏ chữ
       />
     </Card>
   );
 }
 
 // ==========================================
-// 6. MAIN COMPONENT
+// 4. COMPONENT BẢNG THI ĐUA (LOGIC ĐÃ CẬP NHẬT ĐỂ XỬ LÝ DỮ LIỆU PHỨC TẠP)
+// ==========================================
+function CompetitionTable() {
+    const [rawDataInput, setRawDataInput] = useState("");
+    const [tableData, setTableData] = useState([]);
+    
+    // Lấy thông tin tháng hiện tại
+    const daysInMonth = moment().daysInMonth();
+    const currentMonth = moment().month() + 1; // 1-12
+    const currentYear = moment().year();
+
+    const tableRef = useRef(null);
+    
+    // Hàm chuẩn hóa tiêu đề và tìm kiếm cột
+    const findColumnIndices = (headerLine) => {
+        const headers = headerLine.split('\t').map(h => h.trim().toLowerCase().replace(/\s/g, ''));
+        
+        // Từ khóa tìm kiếm cho 4 cột bắt buộc (có thể thay đổi tùy theo dữ liệu thực tế)
+        const nameKeywords = ['nganhhang', 'ten', 'nhóm', 'mặt hàng']; // Tên
+        const thucHienKeywords = ['dtqd', 'dtlk', 'datduoc', 'thuchien', 'dtqdth']; // Thực hiện (DT QĐ hoặc DT LK)
+        const targetKeywords = ['target', 'muctieu', 'mt']; // Target
+        const percentKeywords = ['%htdukien', '%hoanthanh']; // % HT Dự kiến
+
+        const indices = {};
+        
+        // Tìm cột Tên (ưu tiên tìm thấy đầu tiên)
+        for (let keyword of nameKeywords) {
+            const index = headers.findIndex(h => h.includes(keyword));
+            if (index !== -1) {
+                indices.nameIndex = index;
+                break;
+            }
+        }
+        
+        // Tìm các cột còn lại
+        for (let keyword of thucHienKeywords) {
+            const index = headers.findIndex(h => h.includes(keyword));
+            if (index !== -1 && index !== indices.nameIndex) {
+                indices.thucHienIndex = index;
+                break;
+            }
+        }
+        
+        for (let keyword of targetKeywords) {
+            const index = headers.findIndex(h => h.includes(keyword));
+            if (index !== -1 && index !== indices.nameIndex && index !== indices.thucHienIndex) {
+                indices.targetIndex = index;
+                break;
+            }
+        }
+
+        for (let keyword of percentKeywords) {
+            const index = headers.findIndex(h => h.includes(keyword));
+            if (index !== -1 && index !== indices.nameIndex && index !== indices.thucHienIndex && index !== indices.targetIndex) {
+                indices.percentIndex = index;
+                break;
+            }
+        }
+        
+        return indices;
+    };
+
+    // Hàm kiểm tra xem một dòng có phải là dòng tiêu đề không (dựa trên từ khóa và số cột)
+    const isHeaderLine = (line) => {
+        const normalizedLine = line.trim().toLowerCase();
+        const headerKeywords = ['nganhhang', 'dtqd', 'target', '%ht'];
+        return headerKeywords.some(kw => normalizedLine.includes(kw));
+    };
+
+    const processCompetitionData = useCallback((dataInput) => {
+        if (!dataInput) {
+            setTableData([]);
+            return;
+        }
+
+        const lines = dataInput.trim().split('\n').map(line => line.trim()).filter(line => line);
+        if (lines.length < 2) {
+            setTableData([]);
+            return;
+        }
+        
+        const results = [];
+        let currentIndices = null;
+        let blockKey = 0; // Chỉ mục để phân biệt các khối dữ liệu
+
+        // Hàm chuyển đổi sang số (chấp nhận cả giá trị rỗng/khoảng trắng)
+        const convertToNumber = (str) => {
+            if (!str) return 0;
+            let cleaned = str.toString().replace(/[^0-9\.\,-]/g, '').replace(/,/g, ''); 
+            if (cleaned.endsWith('%')) cleaned = cleaned.slice(0, -1);
+            return parseFloat(cleaned) || 0; 
+        };
+        
+        // Lặp qua từng dòng dữ liệu
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const parts = line.split('\t').map(p => p.trim());
+            
+            // 1. Kiểm tra nếu là dòng tiêu đề mới
+            if (isHeaderLine(line)) {
+                const indices = findColumnIndices(line);
+                
+                // Nếu tìm thấy Tên và Target, đây là tiêu đề hợp lệ
+                if (indices.nameIndex !== undefined && indices.targetIndex !== undefined) {
+                    currentIndices = indices;
+                    blockKey++;
+                    continue; // Bỏ qua dòng tiêu đề
+                }
+            } 
+            
+            // 2. Xử lý dòng dữ liệu (nếu đã có bộ chỉ mục)
+            if (currentIndices && currentIndices.nameIndex !== undefined && currentIndices.targetIndex !== undefined) {
+                // Kiểm tra nếu là dòng Tổng Cộng
+                if (line.toLowerCase().includes('tổng') || line.toLowerCase().includes('total') || line.toLowerCase().includes('sum')) {
+                    continue; 
+                }
+                
+                // Dữ liệu hợp lệ (phải có đủ số phần tử cho các chỉ mục đã tìm)
+                if (parts.length > Math.max(currentIndices.nameIndex, currentIndices.thucHienIndex || 0, currentIndices.targetIndex, currentIndices.percentIndex || 0)) {
+                    
+                    const name = parts[currentIndices.nameIndex] || '';
+                    if (!name || name.toLowerCase().includes('ngành hàng')) continue; // Bỏ qua nếu cột tên bị trống hoặc vẫn là tiêu đề
+
+                    // Lấy giá trị từ chỉ mục đã tìm được
+                    const thucHien = currentIndices.thucHienIndex !== undefined ? convertToNumber(parts[currentIndices.thucHienIndex]) : 0;
+                    const target = currentIndices.targetIndex !== undefined ? convertToNumber(parts[currentIndices.targetIndex]) : 0;
+                    
+                    if (target === 0 && thucHien === 0) continue; // Bỏ qua nếu cả hai giá trị là 0
+
+                    let percentHT = '';
+                    if (currentIndices.percentIndex !== undefined) {
+                        // Lấy giá trị % từ cột gốc
+                        percentHT = parts[currentIndices.percentIndex] || '-';
+                        if (!percentHT.includes('%')) {
+                            // Xử lý trường hợp giá trị là 0.53.24 thay vì 53.24%
+                            const val = convertToNumber(parts[currentIndices.percentIndex]);
+                            percentHT = val.toFixed(2) + '%'; 
+                        }
+                    } else {
+                        // Tự tính nếu không có cột % HT
+                        percentHT = target > 0 ? ((thucHien / target) * 100).toFixed(2) + '%' : '-';
+                    }
+                    
+                    // CÔNG THỨC MỚI: (Target * 120%) / Số ngày trong tháng
+                    const targetNgay = (target * 1.2) / daysInMonth; 
+
+                    // Format hiển thị (đơn vị Triệu đồng)
+                    const formattedTargetNgay = targetNgay > 0 ? formatMoneyShort(targetNgay * 1000000) : '0';
+                    
+                    results.push({
+                        key: `${name}-${i}-${blockKey}`,
+                        name: name,
+                        thucHien: thucHien, // Đơn vị Triệu
+                        target: target, // Đơn vị Triệu
+                        percentHT: percentHT,
+                        targetNgay: targetNgay,
+                        formattedTargetNgay: formattedTargetNgay,
+                    });
+                }
+            }
+        }
+        
+        if (results.length === 0) {
+             message.warning("Đã xử lý dữ liệu, nhưng không tìm thấy dòng dữ liệu hợp lệ (có Tên và Target) nào. Vui lòng đảm bảo các cột Tên, Thực hiện, Target được dán chính xác.");
+        }
+        setTableData(results);
+    }, [daysInMonth]);
+
+    useEffect(() => {
+        processCompetitionData(rawDataInput);
+    }, [rawDataInput, processCompetitionData]);
+
+    const columns = [
+        { title: "Ngành Hàng / Nhóm", dataIndex: "name", key: "name", width: 250, fixed: 'left',
+          render: (text) => <b style={{fontSize: 12, color: '#1890ff'}}>{text}</b> 
+        },
+        { title: "Thực Hiện (Tr)", dataIndex: "thucHien", key: "thucHien", align: 'right', width: 120,
+            sorter: (a, b) => a.thucHien - b.thucHien,
+            render: (val) => formatMoneyShort(val * 1000000) 
+        },
+        { title: "Target Tháng (Tr)", dataIndex: "target", key: "target", align: 'right', width: 150,
+            sorter: (a, b) => a.target - b.target, 
+            render: (val) => formatMoneyShort(val * 1000000)
+        },
+        { title: "% HT Dự Kiến", dataIndex: "percentHT", key: "percentHT", align: 'center', width: 120,
+            sorter: (a, b) => parseFloat(a.percentHT) - parseFloat(b.percentHT),
+            render: (text) => {
+                const percent = parseFloat(text.toString().replace(/%/g, '')) || 0;
+                const color = percent >= 100 ? 'green' : (percent >= 70 ? 'blue' : 'red');
+                return <Tag color={color}>{text}</Tag>;
+            }
+        },
+        { 
+            title: (
+                <Tooltip title={`Công thức: (Target Tháng * 120%) / ${daysInMonth} ngày`}>
+                    Target Ngày ({daysInMonth} ngày) <InfoCircleOutlined />
+                </Tooltip>
+            ),
+            dataIndex: "formattedTargetNgay", key: "formattedTargetNgay", align: 'right', width: 180,
+            sorter: (a, b) => a.targetNgay - b.targetNgay,
+            render: (text, record) => {
+                if(record.target === 0) return '-';
+                return <b style={{color: '#722ed1'}}>{text}</b>
+            }
+        },
+    ];
+
+    // Tạo tiêu đề thi đua hiển thị 1 lần duy nhất ở trên
+    const competitionHeader = (
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
+            <div style={{fontSize: 16, fontWeight: 'bold', color: '#1890ff'}}>
+                <TrophyOutlined /> BẢNG THEO DÕI THI ĐUA THÁNG {currentMonth}/{currentYear}
+            </div>
+        </div>
+    );
+
+
+    return (
+        <Card style={cardStyle} bodyStyle={{padding: 20}}>
+            {competitionHeader}
+            
+            <Row gutter={[16, 16]}>
+                <Col span={24}>
+                    <Input.TextArea
+                        rows={6}
+                        placeholder={`Dán dữ liệu thi đua thô (Ngành hàng, Thực hiện, Target, % HT Dự kiến...) vào đây. 
+Code sẽ tự động tìm kiếm các cột: Tên (Ngành hàng), Thực hiện (DT QĐ/LK), Target (Mục tiêu) và % HT Dự kiến.
+Bạn có thể dán nhiều khối dữ liệu vào cùng lúc.`}
+                        value={rawDataInput}
+                        onChange={(e) => setRawDataInput(e.target.value)}
+                        style={{fontFamily: 'monospace'}}
+                    />
+                </Col>
+            </Row>
+
+            <Divider orientation="left" style={{marginTop: 20}}>Kết quả Phân tích ({tableData.length} dòng)</Divider>
+            
+            <div ref={tableRef} id="competition-table" style={{ fontSize: '12px' }}>
+                <Table
+                    dataSource={tableData}
+                    columns={columns}
+                    pagination={{ pageSize: 10 }}
+                    size="small"
+                    rowKey="key"
+                    bordered
+                    scroll={{ x: 'max-content' }} // Tối ưu hiển thị ngang
+                />
+            </div>
+        </Card>
+    );
+}
+
+
+// ==========================================
+// 5. MAIN COMPONENT (FINAL - GIỮ NGUYÊN)
 // ==========================================
 
 export default function ExcelDashboard() {
     const [allData, setAllData] = useState([]); 
     const [filters, setFilters] = useState({ creators: [], statuses: [], dateRange: [], keyword: '' });
-
     const [stats, setStats] = useState({ 
         totalRevenue: 0, totalQuantity: 0, totalConvertedRevenue: 0,
         conversionEfficiency: 0, installmentRate: 0, installmentCount: 0,
-        totalContracts: 0, pendingConvertedRevenue: 0
     });
     const [industryData, setIndustryData] = useState([]);
     const [staffData, setStaffData] = useState([]);
@@ -638,13 +919,12 @@ export default function ExcelDashboard() {
         reader.readAsBinaryString(file);
     };
 
-    // Lọc dữ liệu khi bộ lọc thay đổi
     const filteredData = useMemo(() => {
         if (allData.length === 0) return [];
         return allData.filter(item => {
             const matchCreator = filters.creators.length === 0 || filters.creators.includes(item.nguoiTao);
             const matchStatus = filters.statuses.length === 0 || filters.statuses.includes(item.trangThaiXuat);
-            const keyword = filters.keyword.toLowerCase();
+            const keyword = filters.keyword ? filters.keyword.toLowerCase() : '';
             const matchKeyword = !keyword || item.tenSP.toString().toLowerCase().includes(keyword) || item.maDonHang.toString().toLowerCase().includes(keyword);
             let matchDate = true;
             if (filters.dateRange && filters.dateRange.length === 2 && item.ngayTao) {
@@ -667,8 +947,6 @@ export default function ExcelDashboard() {
         let totalQty = 0;
         let totalConvertedRev = 0;
         let installmentCount = 0;
-        let pendingConvertedRev = 0;
-        let bhRevenue = 0;
         
         const hierarchyMap = {};
         const staffMap = {};
@@ -684,10 +962,8 @@ export default function ExcelDashboard() {
             totalRev += rev;
             totalQty += qty;
             totalConvertedRev += convertedRev;
-            if (coefficient === 4.18) bhRevenue += rev;
 
             if (item.loaiYCX && item.loaiYCX.toLowerCase().includes("trả góp")) installmentCount++;
-            if (item.trangThaiXuat && item.trangThaiXuat !== "Đã xuất") pendingConvertedRev += convertedRev;
 
             // Hierarchy
             const parentKey = item.nganhHang || "Khác";
@@ -744,7 +1020,6 @@ export default function ExcelDashboard() {
             installmentRate: parseFloat(installmentRate.toFixed(2)),
             installmentCount: installmentCount,
             totalContracts: data.length,
-            pendingConvertedRevenue: pendingConvertedRev
         });
 
         setIndustryData(finalIndustryData);
@@ -754,6 +1029,30 @@ export default function ExcelDashboard() {
     const handleResetFilters = () => {
         setFilters({ creators: [], statuses: [], dateRange: [], keyword: '' });
     };
+
+    const withCaptureButton = (Component, id, title) => {
+        const CaptureWrapper = (props) => (
+            <div id={id} style={{ position: 'relative' }}>
+                <Component {...props} />
+                <Button 
+                    type="dashed" 
+                    icon={<CameraOutlined />} 
+                    size="small"
+                    onClick={() => captureTable(id, `${title.toLowerCase().replace(/\s/g, '_')}.png`)}
+                    style={{ position: 'absolute', top: 12, right: 12, zIndex: 100 }}
+                >
+                    Chụp
+                </Button>
+            </div>
+        );
+        return CaptureWrapper;
+    };
+
+    const DetailIndustryTableWrapped = withCaptureButton(DetailIndustryTable, 'detail-industry-table', 'Bao_cao_nganh_hang');
+    const StaffAvgPriceTableWrapped = withCaptureButton(StaffAvgPriceTable, 'staff-avg-price-table', 'Don_gia_TB_NV');
+    const TopStaffRankingWrapped = withCaptureButton(TopStaffRanking, 'top-staff-ranking-table', 'Xep_hang_nhan_vien');
+    const CompetitionTableWrapped = withCaptureButton(CompetitionTable, 'competition-table', 'Bao_cao_thi_dua');
+
 
     return (
         <div style={{ padding: "24px", backgroundColor: "#f0f2f5", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" }}>
@@ -785,17 +1084,22 @@ export default function ExcelDashboard() {
                             <Tabs defaultActiveKey="1" type="card" size="large" tabBarStyle={{ margin: 0, padding: "10px 10px 0 10px", background: "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
                                 <TabPane tab={<span><AppstoreOutlined /> Chi Tiết Ngành Hàng</span>} key="1">
                                     <div style={{ padding: 20 }}>
-                                        <DetailIndustryTable industryData={industryData} totalRevenue={stats.totalRevenue} creators={uniqueCreators} filters={filters} setFilters={setFilters} />
+                                        <DetailIndustryTableWrapped industryData={industryData} totalRevenue={stats.totalRevenue} creators={uniqueCreators} filters={filters} setFilters={setFilters} />
                                     </div>
                                 </TabPane>
                                 <TabPane tab={<span><DollarOutlined /> Đơn Giá TB / Nhóm</span>} key="3">
                                     <div style={{ padding: 20 }}>
-                                        <StaffAvgPriceTable rawData={filteredData} />
+                                        <StaffAvgPriceTableWrapped rawData={filteredData} />
+                                    </div>
+                                </TabPane>
+                                <TabPane tab={<span><TrophyOutlined /> Bảng Thi Đua</span>} key="4">
+                                    <div style={{ padding: 20 }}>
+                                        <CompetitionTableWrapped />
                                     </div>
                                 </TabPane>
                                 <TabPane tab={<span><UserOutlined /> Xếp Hạng Nhân Viên</span>} key="2">
                                     <div style={{ padding: 20 }}>
-                                        <TopStaffRanking staffData={staffData} totalRevenue={stats.totalRevenue} />
+                                        <TopStaffRankingWrapped staffData={staffData} totalRevenue={stats.totalRevenue} />
                                     </div>
                                 </TabPane>
                             </Tabs>
