@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Row, Col, Card, Button, Select, DatePicker, Input, Table, Tabs, Tag, Space, Spin, message, Progress, Statistic } from "antd";
+import { Row, Col, Card, Button, Select, DatePicker, Input, Table, Tabs, Tag, Space, Spin, message, Progress, Statistic, Popover, Checkbox, Divider } from "antd";
 import {
   ReloadOutlined,
   PlusOutlined,
@@ -13,7 +13,11 @@ import {
   ArrowDownOutlined,
   SearchOutlined,
   TrophyOutlined,
-  RiseOutlined
+  RiseOutlined,
+  FilterFilled,
+  UserOutlined,
+  AppstoreOutlined,
+  SettingOutlined
 } from "@ant-design/icons";
 import moment from "moment";
 
@@ -22,7 +26,7 @@ const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
 // ==========================================
-// STYLES & FORMATTING
+// STYLES
 // ==========================================
 const cardStyle = {
   borderRadius: 12,
@@ -47,88 +51,45 @@ const formatMoneyShort = (amount) => {
 };
 
 // ==========================================
-// 1. CẤU HÌNH WHITELIST (CHỈ TÍNH CÁC NGÀNH NÀY)
+// 1. CẤU HÌNH WHITELIST & HỆ SỐ
 // ==========================================
-const ALLOWED_IDS = [
-    "1034", // Dụng cụ nhà bếp
-    "1116", // Máy lọc nước
-    "1214", // Gia dụng lắp đặt
-    "1274", // Đồng hồ thời trang
-    "13",   // Điện thoại
-    "1394", // Phụ kiện lắp đặt
-    "16",   // Phụ kiện tiện ích
-    "164",  // VAS
-    "1754", // Máy lạnh, nước nóng
-    "1755", // Tủ lạnh, đông, mát
-    "1756", // Máy giặt, sấy
-    "184",  // Phụ kiện trang trí
-    "22",   // Laptop
-    "23",   // Wearable
-    "244",  // Tablet
-    "304",  // Điện tử
-    "484",  // Điện gia dụng
-    "664"   // Sim Online
-];
+const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664"];
 
 const isAllowedProduct = (industryStr, groupStr) => {
     const check = (str) => str && ALLOWED_IDS.some(id => str.toString().startsWith(id));
     return check(industryStr) || check(groupStr);
 };
 
-// ==========================================
-// 2. CẬP NHẬT HỆ SỐ QUI ĐỔI (THEO BẢNG MỚI)
-// ==========================================
 const getConversionCoefficient = (industryStr, groupStr) => {
-    // Lấy ID Ngành hàng (iID) và Nhóm hàng (gID)
     const iID = industryStr ? industryStr.toString().split(" - ")[0].trim() : "";
     const gID = groupStr ? groupStr.toString().split(" - ")[0].trim() : "";
+    const id = gID || iID; 
+    const str = (groupStr || industryStr || "").toLowerCase();
 
-    // 1. SIM SỐ ONLINE (664) -> 545%
-    if (iID === "664") return 5.45;
-
-    // 2. VAS (164)
-    // - Dịch Vụ Bảo Hiểm (4479) -> 418%
-    // - Còn lại (UDDĐ, Ứng dụng...) -> 100%
-    if (iID === "164") {
-        if (gID === "4479") return 4.18;
+    if (iID === "664" || str.includes("sim")) return 5.45;
+    if (iID === "164" || str.includes("bảo hiểm")) {
+        if (gID === "4479" || str.includes("bảo hiểm")) return 4.18;
         return 1.0;
     }
-
-    // 3. PHỤ KIỆN (16, 184, 1394) -> 337%
     if (["16", "184", "1394"].includes(iID)) return 3.37;
-
-    // 4. ĐỒNG HỒ & WEARABLE (1274, 23) -> 300%
     if (["1274", "23"].includes(iID)) return 3.00;
-
-    // 5. DỤNG CỤ NHÀ BẾP (1034) -> 192%
     if (iID === "1034") return 1.92;
-
-    // 6. MÁY LỌC NƯỚC (1116)
-    // - Lọc nước dạng tủ đứng (4171) -> 185%
-    // - Còn lại -> 192%
     if (iID === "1116") {
         if (gID === "4171") return 1.85;
         return 1.92;
     }
-
-    // 7. GIA DỤNG CÓ ĐIỆN (484, 1214) -> 185%
     if (["484", "1214"].includes(iID)) return 1.85;
-
-    // 8. ĐIỆN TỬ (304)
-    // - Loa Karaoke (880) -> 129%
-    // - Còn lại (Tivi...) -> 100%
     if (iID === "304") {
-        if (gID === "880") return 1.29;
+        if (gID === "880" || str.includes("loa") || str.includes("karaoke")) return 1.29;
+        if (str.includes("dàn máy") || str.includes("âm thanh")) return 1.02;
         return 1.0;
     }
-
-    // 9. CÁC NGÀNH MẶC ĐỊNH 100%
-    // (13-Điện thoại, 22-Laptop, 244-Tablet, 1754/1755/1756-Điện lạnh...)
+    if (str.includes("xe đạp")) return 1.12;
     return 1.0;
 };
 
 // ==========================================
-// 3. COMPONENT BỘ LỌC
+// 2. COMPONENT BỘ LỌC TỔNG
 // ==========================================
 
 function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
@@ -206,7 +167,7 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
 }
 
 // ==========================================
-// 4. CÁC COMPONENT HIỂN THỊ
+// 3. CÁC COMPONENT HIỂN THỊ
 // ==========================================
 
 function OverviewSection({ stats }) {
@@ -214,58 +175,24 @@ function OverviewSection({ stats }) {
   const EffIcon = stats.conversionEfficiency >= 0 ? ArrowUpOutlined : ArrowDownOutlined;
 
   const cards = [
-    {
-      title: "TỔNG DOANH THU THỰC",
-      value: formatMoneyShort(stats.totalRevenue),
-      sub: `Tổng số lượng: ${stats.totalQuantity}`,
-      icon: <FundOutlined style={{ fontSize: 24, color: "#fff" }} />,
-      background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)",
-      shadow: "0 10px 20px -10px rgba(60, 140, 231, 0.5)"
-    },
-    {
-      title: "TỔNG DOANH THU QUY ĐỔI",
-      value: formatMoneyShort(stats.totalConvertedRevenue),
-      sub: "DTQĐ = DT Thực * Hệ số",
-      icon: <RiseOutlined style={{ fontSize: 24, color: "#fff" }} />,
-      background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)", 
-      shadow: "0 10px 20px -10px rgba(102, 126, 234, 0.5)"
-    },
-    {
-      title: "HIỆU QUẢ QĐ (TỈ TRỌNG)",
-      value: `${stats.conversionEfficiency > 0 ? '+' : ''}${stats.conversionEfficiency}%`,
-      sub: "(DTQĐ - DT Thực) / DT Thực",
-      icon: <EffIcon style={{ fontSize: 24, color: "#fff" }} />,
-      background: stats.conversionEfficiency >= 0 
-          ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)"
-          : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)",
-      shadow: "0 10px 20px -10px rgba(17, 153, 142, 0.5)"
-    },
-    {
-      title: "TỶ LỆ TRẢ GÓP",
-      value: stats.installmentRate + "%",
-      sub: `SL HĐ Trả góp: ${stats.installmentCount}`,
-      icon: <PieChartOutlined style={{ fontSize: 24, color: "#fff" }} />,
-      background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)",
-      shadow: "0 10px 20px -10px rgba(242, 112, 156, 0.5)"
-    }
+    { title: "TỔNG DOANH THU THỰC", value: formatMoneyShort(stats.totalRevenue), sub: `SL: ${stats.totalQuantity}`, icon: <FundOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)" },
+    { title: "TỔNG DOANH THU QUY ĐỔI", value: formatMoneyShort(stats.totalConvertedRevenue), sub: "DTQĐ = DT * Hệ số", icon: <RiseOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)" },
+    { title: "HIỆU QUẢ QĐ (TỈ TRỌNG)", value: `${stats.conversionEfficiency > 0 ? '+' : ''}${stats.conversionEfficiency}%`, sub: "(DTQĐ - DT) / DT", icon: <EffIcon style={{fontSize: 24, color: "#fff"}}/>, background: stats.conversionEfficiency >= 0 ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)" : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)" },
+    { title: "TỶ LỆ TRẢ GÓP", value: stats.installmentRate + "%", sub: `SL HĐ: ${stats.installmentCount}`, icon: <PieChartOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)" }
   ];
 
   return (
     <Row gutter={20} style={{marginBottom: 20}}>
       {cards.map((item, idx) => (
         <Col span={6} key={idx}>
-          <Card bordered={false} style={{ borderRadius: 16, background: item.background, boxShadow: item.shadow, height: 120 }}>
+          <Card bordered={false} style={{ borderRadius: 16, background: item.background, boxShadow: "0 10px 20px -10px rgba(0,0,0,0.2)", height: 120 }}>
             <Row align="middle" justify="space-between">
                 <Col>
                     <div style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600, fontSize: 12, textTransform: "uppercase", marginBottom: 4 }}>{item.title}</div>
                     <div style={{ fontSize: 26, fontWeight: 700, color: "#fff" }}>{item.value}</div>
                     <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{item.sub}</div>
                 </Col>
-                <Col>
-                    <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: "50%", padding: 10 }}>
-                        {item.icon}
-                    </div>
-                </Col>
+                <Col><div style={{ background: "rgba(255,255,255,0.2)", borderRadius: "50%", padding: 10 }}>{item.icon}</div></Col>
             </Row>
           </Card>
         </Col>
@@ -284,10 +211,9 @@ function CategoryChartBar({ industryData, totalRevenue }) {
                 {parentData.length > 0 ? parentData.map((item, index) => {
                     const percent = totalRevenue > 0 ? (item.doanhThu / totalRevenue) * 100 : 0;
                     const bg = colors[index % colors.length];
-                    const displayName = item.name.includes("-") ? item.name.split("-")[1] : item.name;
                     return (
                         <div key={item.key} style={{minWidth: 110, background: "#f9f9f9", padding: 10, borderRadius: 8, border: "1px solid #eee"}}>
-                            <b style={{fontSize: 12, color: "#555"}}>{displayName}</b>
+                            <b style={{fontSize: 12, color: "#555"}}>{item.name.includes("-") ? item.name.split("-")[1] : item.name}</b>
                             <div style={{fontSize: 14, fontWeight: 'bold', margin: "4px 0", color: "#333"}}>{formatMoneyShort(item.doanhThu)}</div>
                             <div style={{ height: 8, width: "100%", background: "#e8e8e8", borderRadius: 4, overflow: 'hidden'}}>
                                 <div style={{ height: '100%', width: `${percent}%`, background: bg }}></div>
@@ -295,7 +221,7 @@ function CategoryChartBar({ industryData, totalRevenue }) {
                             <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>{percent.toFixed(1)}%</div>
                         </div>
                     )
-                }) : <div style={{padding: 20, color: '#999'}}>Không có dữ liệu phù hợp</div>}
+                }) : <div style={{padding: 20, color: '#999'}}>Không có dữ liệu</div>}
             </div>
         </Card>
     );
@@ -304,7 +230,6 @@ function CategoryChartBar({ industryData, totalRevenue }) {
 function StaffHorizontalChart({ staffData }) {
   const sortedStaff = [...staffData].sort((a, b) => b.doanhThu - a.doanhThu).slice(0, 10);
   const maxRevenue = sortedStaff.length > 0 ? sortedStaff[0].doanhThu : 0;
-
   return (
     <Card style={{ ...cardStyle, height: '100%' }} title={<span style={{color: '#1890ff'}}><TrophyOutlined /> Top 10 Doanh Thu</span>}>
       <div style={{ height: 400, overflowY: 'auto', paddingRight: 10 }}>
@@ -341,16 +266,8 @@ function TopStaffRanking({ staffData, totalRevenue }) {
           {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: "#1890ff"}}>{txt}</b>},
           {title: "Doanh Thu Thực", dataIndex: "doanhThu", key: "doanhThu", render: val => formatMoneyShort(val), align: 'right', sorter: (a, b) => a.doanhThu - b.doanhThu},
           {title: "Doanh Thu QĐ", dataIndex: "dtqd", key: "dtqd", render: val => <b style={{color: "#722ed1"}}>{formatMoneyShort(val)}</b>, align: 'right', sorter: (a, b) => a.dtqd - b.dtqd},
-          {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center',
-             render: val => <Tag color={val >= 0 ? "success" : "error"}>{val > 0 ? '+' : ''}{val}%</Tag>,
-             sorter: (a, b) => a.efficiency - b.efficiency
-          },
-          {title: "% Mục Tiêu", key: "target", 
-             render: (_, record) => {
-                 const p = personalTarget > 0 ? (record.doanhThu / personalTarget) * 100 : 0;
-                 return <Progress percent={p} size="small" steps={5} strokeColor="#52c41a" showInfo={false} />
-             }, align: 'center'
-          },
+          {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center', render: val => <Tag color={val >= 0 ? "success" : "error"}>{val > 0 ? '+' : ''}{val}%</Tag>, sorter: (a, b) => a.efficiency - b.efficiency},
+          {title: "% Mục Tiêu", key: "target", render: (_, record) => <Progress percent={personalTarget > 0 ? (record.doanhThu / personalTarget) * 100 : 0} size="small" steps={5} strokeColor="#52c41a" showInfo={false} />, align: 'center'},
           {title: "Bảo Hiểm", dataIndex: "bhRevenue", key: "bhRevenue", render: val => formatMoneyShort(val), align: 'right'},
         ]}
       />
@@ -358,8 +275,69 @@ function TopStaffRanking({ staffData, totalRevenue }) {
   );
 }
 
-function DetailIndustryTable({ industryData, totalRevenue }) {
-    const totalRow = industryData.reduce((acc, item) => {
+// ==========================================
+// 4. BẢNG CHI TIẾT NGÀNH HÀNG (NÂNG CẤP FULL OPTION)
+// ==========================================
+
+function DetailIndustryTable({ industryData, totalRevenue, creators, filters, setFilters }) {
+    const [searchText, setSearchText] = useState('');
+    const [searchedColumn, setSearchedColumn] = useState('');
+    const searchInput = useRef(null);
+    
+    // State cho Lọc nhanh ngành hàng (Local)
+    const [selectedIndustries, setSelectedIndustries] = useState([]);
+
+    // State cho Ẩn/Hiện cột
+    const defaultCheckedList = ['name', 'soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
+    const [checkedList, setCheckedList] = useState(defaultCheckedList);
+    
+    // Lấy danh sách tên ngành hàng để bỏ vào Select lọc nhanh
+    const industryOptions = useMemo(() => {
+        return industryData.filter(item => !item.isChild).map(item => item.name).sort();
+    }, [industryData]);
+
+    // --- LOGIC SEARCH COLUMN ---
+    const getColumnSearchProps = (dataIndex) => ({
+        filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+            <div style={{ padding: 8 }}>
+                <Input
+                    ref={searchInput}
+                    placeholder={`Tìm tên...`}
+                    value={selectedKeys[0]}
+                    onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+                    onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
+                    style={{ marginBottom: 8, display: 'block' }}
+                />
+                <Space>
+                    <Button type="primary" onClick={() => handleSearch(selectedKeys, confirm, dataIndex)} icon={<SearchOutlined />} size="small" style={{ width: 90 }}>Tìm</Button>
+                    <Button onClick={() => handleReset(clearFilters)} size="small" style={{ width: 90 }}>Xóa</Button>
+                </Space>
+            </div>
+        ),
+        filterIcon: filtered => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
+        onFilter: (value, record) => record[dataIndex] ? record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()) : '',
+        onFilterDropdownVisibleChange: visible => { if (visible) setTimeout(() => searchInput.current.select(), 100); },
+    });
+
+    const handleSearch = (selectedKeys, confirm, dataIndex) => { confirm(); setSearchText(selectedKeys[0]); setSearchedColumn(dataIndex); };
+    const handleReset = (clearFilters) => { clearFilters(); setSearchText(''); };
+
+    // --- XỬ LÝ DATA VỚI BỘ LỌC NHANH ---
+    const filteredIndustryData = useMemo(() => {
+        if (selectedIndustries.length === 0) return industryData;
+        return industryData.filter(item => {
+            // Nếu là con, kiểm tra xem cha nó có được chọn không, hoặc chính nó được chọn (nếu logic cần chi tiết)
+            // Ở đây ta lọc theo dòng cha
+            if (item.isChild) {
+                const parentName = item.key.split('-')[0];
+                return selectedIndustries.includes(parentName);
+            }
+            return selectedIndustries.includes(item.name);
+        });
+    }, [industryData, selectedIndustries]);
+
+    // Tính lại dòng tổng cộng dựa trên data đã lọc
+    const totalRow = filteredIndustryData.reduce((acc, item) => {
         if (!item.isChild) {
             return {
                 ...acc,
@@ -371,58 +349,158 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
         return acc;
     }, { name: "TỔNG CỘNG", soLuong: 0, doanhThu: 0, dtqd: 0, key: "total", children: null });
 
-    const dataSource = [...industryData, totalRow];
+    const dataSource = [...filteredIndustryData, totalRow];
 
-    const columns = [
-        { title: "NGÀNH HÀNG / NHÓM HÀNG", dataIndex: "name", key: "name", width: 320, fixed: 'left',
-          render: (text, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 15}}>{text}</b> : <span style={{fontWeight: record.isChild ? 400 : 600, paddingLeft: record.isChild ? 20 : 0}}>{text}</span>
+    // --- CẤU HÌNH CỘT ---
+    const allColumns = [
+        { 
+            title: "NGÀNH HÀNG / NHÓM HÀNG", dataIndex: "name", key: "name", width: 320, fixed: 'left',
+            ...getColumnSearchProps('name'),
+            render: (text, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 15}}>{text}</b> : <span style={{fontWeight: record.isChild ? 400 : 600, paddingLeft: record.isChild ? 20 : 0}}>{text}</span>
         },
-        { title: "SỐ LƯỢNG", dataIndex: "soLuong", key: "soLuong", align: 'center', width: 100,
-          render: (val, record) => record.name === "TỔNG CỘNG" ? <b>{val}</b> : val 
+        { 
+            title: "SỐ LƯỢNG", dataIndex: "soLuong", key: "soLuong", align: 'center', width: 100,
+            sorter: (a, b) => a.soLuong - b.soLuong,
+            render: (val, record) => record.name === "TỔNG CỘNG" ? <b>{val}</b> : val 
         },
-        { title: "DOANH THU THỰC", dataIndex: "doanhThu", key: "doanhThu", align: 'right', width: 150,
-          render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 15}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
+        { 
+            title: "DOANH THU THỰC", dataIndex: "doanhThu", key: "doanhThu", align: 'right', width: 150,
+            sorter: (a, b) => a.doanhThu - b.doanhThu,
+            render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 15}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
         },
-        { title: "DOANH THU QĐ", dataIndex: "dtqd", key: "dtqd", align: 'right', width: 150,
-          render: (val, record) => <b style={{color: "#1890ff"}}>{formatMoneyShort(val)}</b>
+        { 
+            title: "DOANH THU QĐ", dataIndex: "dtqd", key: "dtqd", align: 'right', width: 150,
+            sorter: (a, b) => a.dtqd - b.dtqd,
+            render: (val, record) => <b style={{color: "#1890ff"}}>{formatMoneyShort(val)}</b>
         },
-        { title: "HỆ SỐ", dataIndex: "coefficient", key: "coefficient", align: 'center', width: 90,
-          render: val => val ? <Tag color="purple">{val}</Tag> : "" 
+        { 
+            title: "HỆ SỐ", dataIndex: "coefficient", key: "coefficient", align: 'center', width: 90,
+            render: val => val ? <Tag color="purple">{val}</Tag> : "" 
         },
-        { title: "ĐƠN GIÁ TB", key: "unitPrice", align: 'right', width: 120,
-          render: (_, record) => {
-             if(record.name === "TỔNG CỘNG") return "";
-             const price = record.soLuong > 0 ? record.doanhThu / record.soLuong : 0;
-             return <span style={{color: "#555"}}>{formatMoneyShort(price)}</span>;
-          }
+        { 
+            title: "ĐƠN GIÁ TB", key: "unitPrice", align: 'right', width: 120,
+            sorter: (a, b) => (a.doanhThu/a.soLuong) - (b.doanhThu/b.soLuong),
+            render: (_, record) => {
+                if(record.name === "TỔNG CỘNG") return "";
+                const price = record.soLuong > 0 ? record.doanhThu / record.soLuong : 0;
+                return <span style={{color: "#555"}}>{formatMoneyShort(price)}</span>;
+            }
         },
-        { title: "HIỆU QUẢ", key: "efficiency", align: 'right', width: 140,
-          render: (_, record) => {
-             if(record.name === "TỔNG CỘNG") return "";
-             const eff = record.doanhThu > 0 ? ((record.dtqd - record.doanhThu)/record.doanhThu)*100 : 0;
-             const color = eff >= 0 ? "#52c41a" : "#f5222d";
-             return <Tag color={color}>{eff > 0 ? '+' : ''}{eff.toFixed(1)}%</Tag>
-          }
+        { 
+            title: "HIỆU QUẢ", key: "efficiency", align: 'right', width: 140,
+            sorter: (a, b) => {
+                const effA = a.doanhThu > 0 ? ((a.dtqd - a.doanhThu)/a.doanhThu) : -999;
+                const effB = b.doanhThu > 0 ? ((b.dtqd - b.doanhThu)/b.doanhThu) : -999;
+                return effA - effB;
+            },
+            render: (_, record) => {
+                if(record.name === "TỔNG CỘNG") return "";
+                const eff = record.doanhThu > 0 ? ((record.dtqd - record.doanhThu)/record.doanhThu)*100 : 0;
+                const color = eff >= 0 ? "#52c41a" : "#f5222d";
+                return <Tag color={color}>{eff > 0 ? '+' : ''}{eff.toFixed(1)}%</Tag>
+            }
         },
-        { title: "% ĐÓNG GÓP", key: "percent", width: 180,
-          render: (_, record) => {
-             if(record.name === "TỔNG CỘNG") return "";
-             const p = totalRevenue > 0 ? (record.doanhThu / totalRevenue) * 100 : 0;
-             return <div style={{display: 'flex', alignItems: 'center', gap: 8}}><span style={{width: 35, fontSize: 12}}>{p.toFixed(1)}%</span><Progress percent={p} showInfo={false} size="small" strokeColor="#1890ff" /></div>
-          }
+        { 
+            title: "% ĐÓNG GÓP", key: "percent", width: 180,
+            render: (_, record) => {
+                if(record.name === "TỔNG CỘNG") return "";
+                const p = totalRevenue > 0 ? (record.doanhThu / totalRevenue) * 100 : 0;
+                return <div style={{display: 'flex', alignItems: 'center', gap: 8}}><span style={{width: 35, fontSize: 12}}>{p.toFixed(1)}%</span><Progress percent={p} showInfo={false} size="small" strokeColor="#1890ff" /></div>
+            }
         }
     ];
 
+    // Lọc cột theo cấu hình ẩn hiện
+    const visibleColumns = allColumns.filter(col => checkedList.includes(col.key));
+
+    // Nội dung Popover cấu hình cột
+    const columnOptions = [
+        { label: 'Ngành Hàng', value: 'name', disabled: true },
+        { label: 'Số Lượng', value: 'soLuong' },
+        { label: 'Doanh Thu Thực', value: 'doanhThu' },
+        { label: 'Doanh Thu QĐ', value: 'dtqd' },
+        { label: 'Hệ Số', value: 'coefficient' },
+        { label: 'Đơn Giá TB', value: 'unitPrice' },
+        { label: 'Hiệu Quả', value: 'efficiency' },
+        { label: '% Đóng Góp', value: 'percent' },
+    ];
+
+    const content = (
+        <Checkbox.Group 
+            options={columnOptions} 
+            value={checkedList} 
+            onChange={setCheckedList}
+            style={{display: 'flex', flexDirection: 'column', gap: 8}}
+        />
+    );
+
   return (
     <Card style={cardStyle}>
-        <div style={{marginBottom: 16, fontWeight: 'bold', fontSize: 16, color: '#1890ff'}}><TableOutlined /> CHI TIẾT NGÀNH HÀNG (Drill-down)</div>
-        <Table columns={columns} dataSource={dataSource} scroll={{x: 1200, y: 500}} pagination={false} size="middle" rowKey="key" bordered expandable={{defaultExpandAllRows: false}}/>
+        <div style={{marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10}}>
+            <div style={{fontWeight: 'bold', fontSize: 16, color: '#1890ff'}}>
+                <TableOutlined /> CHI TIẾT NGÀNH HÀNG (Drill-down)
+            </div>
+            
+            <div style={{display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center'}}>
+                {/* BỘ LỌC NGÀNH HÀNG NHANH (MỚI) */}
+                <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <AppstoreOutlined style={{color: '#888'}} />
+                    <Select 
+                        mode="multiple" 
+                        maxTagCount={1}
+                        placeholder="Lọc nhanh Ngành hàng" 
+                        style={{width: 200}} 
+                        size="small"
+                        value={selectedIndustries}
+                        onChange={setSelectedIndustries}
+                        allowClear
+                    >
+                        {industryOptions.map(c => <Option key={c} value={c}>{c}</Option>)}
+                    </Select>
+                </div>
+
+                {/* BỘ LỌC NHÂN VIÊN NHANH */}
+                <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <UserOutlined style={{color: '#888'}} />
+                    <Select 
+                        mode="multiple" 
+                        maxTagCount={1}
+                        placeholder="Lọc nhanh Nhân viên" 
+                        style={{width: 200}} 
+                        size="small"
+                        value={filters.creators}
+                        onChange={val => setFilters(prev => ({...prev, creators: val}))}
+                        allowClear
+                    >
+                        {creators.map(c => <Option key={c} value={c}>{c}</Option>)}
+                    </Select>
+                </div>
+
+                <Divider type="vertical" />
+
+                {/* NÚT CẤU HÌNH CỘT (MỚI) */}
+                <Popover content={content} title="Ẩn/Hiện Cột" trigger="click" placement="bottomRight">
+                    <Button icon={<SettingOutlined />} size="small">Cột</Button>
+                </Popover>
+            </div>
+        </div>
+        
+        <Table 
+            columns={visibleColumns} 
+            dataSource={dataSource} 
+            scroll={{x: 1200, y: 500}} 
+            pagination={false} 
+            size="middle" 
+            rowKey="key" 
+            bordered 
+            expandable={{defaultExpandAllRows: false}}
+        />
     </Card>
   );
 }
 
 // ==========================================
-// 5. COMPONENT CHÍNH (CORE LOGIC)
+// 5. COMPONENT CHÍNH
 // ==========================================
 
 export default function ExcelDashboard() {
@@ -628,7 +706,13 @@ export default function ExcelDashboard() {
              </Col>
           </Row>
 
-          <DetailIndustryTable industryData={industryData} totalRevenue={stats.totalRevenue} />
+          <DetailIndustryTable 
+                industryData={industryData} 
+                totalRevenue={stats.totalRevenue} 
+                creators={uniqueCreators}
+                filters={filters}
+                setFilters={setFilters}
+          />
       </Spin>
     </div>
   );
