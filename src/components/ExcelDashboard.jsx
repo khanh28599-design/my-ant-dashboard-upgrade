@@ -60,11 +60,25 @@ const formatMoneyShort = (amount) => {
 };
 
 // ==========================================
-// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH (GIỮ NGUYÊN)
+// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH (CÓ THÊM LỌC HÌNH THỨC XUẤT)
 // ==========================================
 
 // Whitelist IDs (Giữ nguyên)
 const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664"];
+
+// Danh sách cố định các Hình thức xuất được tick xanh từ ảnh người dùng
+// Dữ liệu sẽ CHỈ LẤY các dòng có Hình thức xuất trong danh sách này.
+const ALLOWED_EXPORT_TYPES = [
+    "Xuất bán ưu đãi cho nhân viên",
+    "Xuất đổi bảo hành sản phẩm IMEI",
+    "Xuất đổi bảo hành sản phẩm trả góp",
+    "Xuất bán hàng tại siêu thị",
+    "Xuất bán hàng trả góp tại siêu thị",
+    "Xuất SIM trắng kèm theo SIM",
+    "Xuất dịch vụ thu hộ bảo hiểm",
+    "Xuất dịch vụ bảo hành trọn đời",
+    "Xuất đổi bảo hành tại siêu thị",
+];
 
 const isAllowedProduct = (industryStr, groupStr) => {
     const check = (str) => str && ALLOWED_IDS.some(id => str.toString().startsWith(id));
@@ -130,7 +144,7 @@ const captureTable = async (elementId, filename) => {
 // 1. COMPONENT BỘ LỌC TỔNG (GIỮ NGUYÊN)
 // ==========================================
 
-function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
+function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters, setFilters, onReset }) {
   const handleChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -151,8 +165,8 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
   return (
     <Card style={{ ...cardStyle, marginBottom: 20 }}>
       <Row gutter={[16, 16]} align="middle" justify="start">
-        <Col span={4}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Người tạo ({creators.length})</b></div>
+        <Col span={3}>
+          <div style={{color: "#666", marginBottom: 4}}><b>Người tạo</b></div>
           <Select 
             mode="multiple" allowClear placeholder="Chọn nhân viên..."
             value={filters.creators} onChange={(val) => handleChange('creators', val)}
@@ -161,7 +175,7 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
             {creators.map(c => <Option key={c} value={c}>{c}</Option>)}
           </Select>
         </Col>
-        <Col span={4}>
+        <Col span={3}>
           <div style={{color: "#666", marginBottom: 4}}><b>Trạng thái xuất</b></div>
           <Select 
             mode="multiple" allowClear placeholder="Chọn trạng thái..."
@@ -169,6 +183,26 @@ function FilterPanel({ creators, statuses, filters, setFilters, onReset }) {
             size="middle" style={{ width: "100%" }}
           >
             {statuses.map(s => <Option key={s} value={s}>{s}</Option>)}
+          </Select>
+        </Col>
+        <Col span={3}>
+          <div style={{color: "#666", marginBottom: 4}}><b>Hình thức xuất</b></div>
+          <Select 
+            mode="multiple" allowClear placeholder="Chọn hình thức..."
+            value={filters.exportTypes} onChange={(val) => handleChange('exportTypes', val)}
+            size="middle" style={{ width: "100%" }}
+          >
+            {exportTypes.map(s => <Option key={s} value={s}>{s}</Option>)}
+          </Select>
+        </Col>
+        <Col span={3}>
+          <div style={{color: "#666", marginBottom: 4}}><b>Tình trạng nhập trả</b></div>
+          <Select 
+            mode="multiple" allowClear placeholder="Chọn tình trạng..."
+            value={filters.returnStatuses} onChange={(val) => handleChange('returnStatuses', val)}
+            size="middle" style={{ width: "100%" }}
+          >
+            {returnStatuses.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
         </Col>
         <Col span={4}>
@@ -208,7 +242,7 @@ function OverviewSection({ stats }) {
     { title: "TỔNG DOANH THU THỰC", value: formatMoneyShort(stats.totalRevenue), sub: `SL: ${stats.totalQuantity}`, icon: <FundOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)" },
     { title: "TỔNG DOANH THU QUY ĐỔI", value: formatMoneyShort(stats.totalConvertedRevenue), sub: "DTQĐ = DT * Hệ số", icon: <RiseOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)" },
     { title: "HIỆU QUẢ QĐ (TỈ TRỌNG)", value: `${stats.conversionEfficiency > 0 ? '+' : ''}${stats.conversionEfficiency}%`, sub: "(DTQĐ - DT) / DT", icon: <EffIcon style={{fontSize: 24, color: "#fff"}}/>, background: stats.conversionEfficiency >= 0 ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)" : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)" },
-    { title: "TỶ LỆ TRẢ GÓP", value: stats.installmentRate + "%", sub: `SL HĐ: ${stats.installmentCount}`, icon: <PieChartOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)" }
+    { title: "TỶ LỆ TRẢ GÓP", value: stats.installmentRate + "%", sub: `SL HĐ: ${stats.totalContracts > 0 ? (stats.installmentCount / stats.totalContracts * 100).toFixed(1) : 0}%`, icon: <PieChartOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)" }
   ];
 
   return (
@@ -316,7 +350,7 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
     const searchInput = useRef(null);
     const [selectedIndustries, setSelectedIndustries] = useState([]);
     const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
-    const [checkedList, setCheckedList] = useState(defaultCheckedList);
+    const [checkedList, setCheckedList] = defaultCheckedList;
     
     const industryOptions = useMemo(() => {
         return industryData.filter(item => !item.isChild).map(item => item.name).sort();
@@ -605,7 +639,7 @@ function StaffAvgPriceTable({ rawData }) {
 }
 
 // ==========================================
-// 4. COMPONENT BẢNG THI ĐUA (LOGIC ĐÃ CẬP NHẬT ĐỂ XỬ LÝ DỮ LIỆU PHỨC TẠP)
+// 4. COMPONENT BẢNG THI ĐUA (CẬP NHẬT LOGIC LỌC TỐT HƠN)
 // ==========================================
 function CompetitionTable() {
     const [rawDataInput, setRawDataInput] = useState("");
@@ -618,13 +652,14 @@ function CompetitionTable() {
 
     const tableRef = useRef(null);
     
-    // Hàm chuẩn hóa tiêu đề và tìm kiếm cột
+    // Hàm chuẩn hóa tiêu đề và tìm kiếm cột (CẬP NHẬT)
     const findColumnIndices = (headerLine) => {
-        const headers = headerLine.split('\t').map(h => h.trim().toLowerCase().replace(/\s/g, ''));
+        const headers = headerLine.split('\t').map(h => h.trim().toLowerCase().replace(/[^a-z0-9%]/g, ''));
         
-        // Từ khóa tìm kiếm cho 4 cột bắt buộc (có thể thay đổi tùy theo dữ liệu thực tế)
-        const nameKeywords = ['nganhhang', 'ten', 'nhóm', 'mặt hàng']; // Tên
-        const thucHienKeywords = ['dtqd', 'dtlk', 'datduoc', 'thuchien', 'dtqdth']; // Thực hiện (DT QĐ hoặc DT LK)
+        // Từ khóa tìm kiếm cho 4 cột bắt buộc (Ưu tiên tìm kiếm khớp)
+        const nameKeywords = ['nganhhang', 'ten', 'nhom', 'mat hang']; // Tên
+        // DTQD (Doanh thu quy đổi) hoặc SL (Số lượng) hoặc ThucHien
+        const thucHienKeywords = ['dtqd', 'dtlk', 'thuchien', 'datduoc', 'sl', 'sllk']; 
         const targetKeywords = ['target', 'muctieu', 'mt']; // Target
         const percentKeywords = ['%htdukien', '%hoanthanh']; // % HT Dự kiến
 
@@ -639,7 +674,7 @@ function CompetitionTable() {
             }
         }
         
-        // Tìm các cột còn lại
+        // Tìm các cột còn lại (cần phải phân biệt với cột Tên)
         for (let keyword of thucHienKeywords) {
             const index = headers.findIndex(h => h.includes(keyword));
             if (index !== -1 && index !== indices.nameIndex) {
@@ -670,8 +705,25 @@ function CompetitionTable() {
     // Hàm kiểm tra xem một dòng có phải là dòng tiêu đề không (dựa trên từ khóa và số cột)
     const isHeaderLine = (line) => {
         const normalizedLine = line.trim().toLowerCase();
-        const headerKeywords = ['nganhhang', 'dtqd', 'target', '%ht'];
-        return headerKeywords.some(kw => normalizedLine.includes(kw));
+        // Cần có ít nhất 2 trong 4 từ khóa này để xác định là tiêu đề
+        const headerKeywords = ['nganhhang', 'dtqd', 'target', '%ht', 'sl'];
+        const matches = headerKeywords.filter(kw => normalizedLine.includes(kw));
+        return matches.length >= 2;
+    };
+
+    // Hàm chuyển đổi sang số (CẬP NHẬT LOGIC LÀM SẠCH VÀ CHUYỂN ĐỔI)
+    const convertToNumber = (str) => {
+        if (!str) return 0;
+        let cleaned = str.toString().trim();
+        
+        // Xóa các ký tự không phải số, dấu phẩy (thập phân), hoặc dấu chấm (ngàn/triệu)
+        // Lưu ý: Dữ liệu bạn cung cấp dùng dấu chấm là dấu phân cách thập phân (ví dụ: 950.42), nên ta sẽ giữ lại dấu chấm
+        cleaned = cleaned.replace(/[^\d\.]/g, ''); 
+        
+        // Nếu số quá lớn (dùng dấu phẩy hoặc chấm để phân cách hàng ngàn), code sẽ không tự xử lý được.
+        // Với dữ liệu đầu vào là 950.421,683.80, ta coi đây là 950.421 và 683.80.
+        // Nếu dữ liệu là 950.42, hàm parse sẽ hiểu là 950.42
+        return parseFloat(cleaned) || 0; 
     };
 
     const processCompetitionData = useCallback((dataInput) => {
@@ -689,15 +741,10 @@ function CompetitionTable() {
         const results = [];
         let currentIndices = null;
         let blockKey = 0; // Chỉ mục để phân biệt các khối dữ liệu
-
-        // Hàm chuyển đổi sang số (chấp nhận cả giá trị rỗng/khoảng trắng)
-        const convertToNumber = (str) => {
-            if (!str) return 0;
-            let cleaned = str.toString().replace(/[^0-9\.\,-]/g, '').replace(/,/g, ''); 
-            if (cleaned.endsWith('%')) cleaned = cleaned.slice(0, -1);
-            return parseFloat(cleaned) || 0; 
-        };
         
+        // Danh sách các tên đã được thêm vào để tránh trùng lặp
+        const addedNames = new Set();
+
         // Lặp qua từng dòng dữ liệu
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -717,8 +764,10 @@ function CompetitionTable() {
             
             // 2. Xử lý dòng dữ liệu (nếu đã có bộ chỉ mục)
             if (currentIndices && currentIndices.nameIndex !== undefined && currentIndices.targetIndex !== undefined) {
-                // Kiểm tra nếu là dòng Tổng Cộng
-                if (line.toLowerCase().includes('tổng') || line.toLowerCase().includes('total') || line.toLowerCase().includes('sum')) {
+                
+                // Kiểm tra nếu là dòng Tổng Cộng hoặc dòng tiêu đề bị lặp
+                const nameCandidate = (parts[currentIndices.nameIndex] || '').toLowerCase();
+                if (nameCandidate.includes('tổng') || nameCandidate.includes('total') || nameCandidate.includes('sum') || nameCandidate.includes('ngành hàng')) {
                     continue; 
                 }
                 
@@ -726,22 +775,28 @@ function CompetitionTable() {
                 if (parts.length > Math.max(currentIndices.nameIndex, currentIndices.thucHienIndex || 0, currentIndices.targetIndex, currentIndices.percentIndex || 0)) {
                     
                     const name = parts[currentIndices.nameIndex] || '';
-                    if (!name || name.toLowerCase().includes('ngành hàng')) continue; // Bỏ qua nếu cột tên bị trống hoặc vẫn là tiêu đề
+                    if (!name || addedNames.has(name)) continue; // Bỏ qua nếu tên trống hoặc đã xử lý trong khối trước
 
                     // Lấy giá trị từ chỉ mục đã tìm được
-                    const thucHien = currentIndices.thucHienIndex !== undefined ? convertToNumber(parts[currentIndices.thucHienIndex]) : 0;
-                    const target = currentIndices.targetIndex !== undefined ? convertToNumber(parts[currentIndices.targetIndex]) : 0;
+                    const thucHienStr = currentIndices.thucHienIndex !== undefined ? parts[currentIndices.thucHienIndex] : '0';
+                    const targetStr = currentIndices.targetIndex !== undefined ? parts[currentIndices.targetIndex] : '0';
                     
-                    if (target === 0 && thucHien === 0) continue; // Bỏ qua nếu cả hai giá trị là 0
+                    const thucHien = convertToNumber(thucHienStr);
+                    const target = convertToNumber(targetStr);
+                    
+                    // Lọc: Bỏ qua nếu cả Thực hiện và Target đều bằng 0
+                    if (target === 0 && thucHien === 0) continue; 
+                    
+                    addedNames.add(name); // Thêm tên vào danh sách đã xử lý
 
                     let percentHT = '';
                     if (currentIndices.percentIndex !== undefined) {
                         // Lấy giá trị % từ cột gốc
-                        percentHT = parts[currentIndices.percentIndex] || '-';
+                        percentHT = (parts[currentIndices.percentIndex] || '-').toString().trim();
                         if (!percentHT.includes('%')) {
-                            // Xử lý trường hợp giá trị là 0.53.24 thay vì 53.24%
-                            const val = convertToNumber(parts[currentIndices.percentIndex]);
-                            percentHT = val.toFixed(2) + '%'; 
+                            // Xử lý trường hợp giá trị là 0.5324 thay vì 53.24%
+                            const val = convertToNumber(percentHT);
+                            percentHT = (val * 100).toFixed(2) + '%'; 
                         }
                     } else {
                         // Tự tính nếu không có cột % HT
@@ -749,25 +804,28 @@ function CompetitionTable() {
                     }
                     
                     // CÔNG THỨC MỚI: (Target * 120%) / Số ngày trong tháng
+                    // Target ở đây là đơn vị Triệu (hoặc Số lượng). 
+                    // Để tính Target Ngày (tiền), ta nhân Target với 1.2 (120%) và chia cho số ngày.
                     const targetNgay = (target * 1.2) / daysInMonth; 
 
-                    // Format hiển thị (đơn vị Triệu đồng)
-                    const formattedTargetNgay = targetNgay > 0 ? formatMoneyShort(targetNgay * 1000000) : '0';
+                    // Format hiển thị (đơn vị Triệu đồng, nếu thucHien/target > 100 thì coi là Triệu)
+                    // Vì dữ liệu bạn dán là 950.42 (Triệu), nên ta coi target/thucHien là đơn vị Triệu rồi
+                    // Chỉ nhân 1000000 khi format để hiển thị đủ "Tr"
                     
                     results.push({
                         key: `${name}-${i}-${blockKey}`,
                         name: name,
-                        thucHien: thucHien, // Đơn vị Triệu
-                        target: target, // Đơn vị Triệu
+                        thucHien: thucHien, // Đơn vị Triệu/SL
+                        target: target, // Đơn vị Triệu/SL
                         percentHT: percentHT,
-                        targetNgay: targetNgay,
-                        formattedTargetNgay: formattedTargetNgay,
+                        targetNgay: targetNgay, // Đơn vị Triệu/SL
+                        formattedTargetNgay: formatMoneyShort(targetNgay * 1000000), // Format hiển thị tiền
                     });
                 }
             }
         }
         
-        if (results.length === 0) {
+        if (results.length === 0 && dataInput.trim().length > 0) {
              message.warning("Đã xử lý dữ liệu, nhưng không tìm thấy dòng dữ liệu hợp lệ (có Tên và Target) nào. Vui lòng đảm bảo các cột Tên, Thực hiện, Target được dán chính xác.");
         }
         setTableData(results);
@@ -781,13 +839,20 @@ function CompetitionTable() {
         { title: "Ngành Hàng / Nhóm", dataIndex: "name", key: "name", width: 250, fixed: 'left',
           render: (text) => <b style={{fontSize: 12, color: '#1890ff'}}>{text}</b> 
         },
-        { title: "Thực Hiện (Tr)", dataIndex: "thucHien", key: "thucHien", align: 'right', width: 120,
+        { title: "Thực Hiện", dataIndex: "thucHien", key: "thucHien", align: 'right', width: 120,
             sorter: (a, b) => a.thucHien - b.thucHien,
-            render: (val) => formatMoneyShort(val * 1000000) 
+            render: (val) => val.toLocaleString('vi-VN') + (val > 100 ? ' Tr' : '') // Ước tính nếu giá trị lớn thì là Triệu
         },
-        { title: "Target Tháng (Tr)", dataIndex: "target", key: "target", align: 'right', width: 150,
+        { title: "Target Tháng", dataIndex: "target", key: "target", align: 'right', width: 150,
             sorter: (a, b) => a.target - b.target, 
-            render: (val) => formatMoneyShort(val * 1000000)
+            render: (val) => val.toLocaleString('vi-VN') + (val > 100 ? ' Tr' : '') // Ước tính nếu giá trị lớn thì là Triệu
+        },
+        { title: "Target Ngày (x120%)", dataIndex: "targetNgay", key: "targetNgay", align: 'right', width: 180,
+            sorter: (a, b) => a.targetNgay - b.targetNgay,
+            render: (val, record) => {
+                if(record.target === 0) return '-';
+                return <b style={{color: '#722ed1'}}>{val.toFixed(2).toLocaleString('vi-VN')}</b>
+            }
         },
         { title: "% HT Dự Kiến", dataIndex: "percentHT", key: "percentHT", align: 'center', width: 120,
             sorter: (a, b) => parseFloat(a.percentHT) - parseFloat(b.percentHT),
@@ -795,19 +860,6 @@ function CompetitionTable() {
                 const percent = parseFloat(text.toString().replace(/%/g, '')) || 0;
                 const color = percent >= 100 ? 'green' : (percent >= 70 ? 'blue' : 'red');
                 return <Tag color={color}>{text}</Tag>;
-            }
-        },
-        { 
-            title: (
-                <Tooltip title={`Công thức: (Target Tháng * 120%) / ${daysInMonth} ngày`}>
-                    Target Ngày ({daysInMonth} ngày) <InfoCircleOutlined />
-                </Tooltip>
-            ),
-            dataIndex: "formattedTargetNgay", key: "formattedTargetNgay", align: 'right', width: 180,
-            sorter: (a, b) => a.targetNgay - b.targetNgay,
-            render: (text, record) => {
-                if(record.target === 0) return '-';
-                return <b style={{color: '#722ed1'}}>{text}</b>
             }
         },
     ];
@@ -818,6 +870,9 @@ function CompetitionTable() {
             <div style={{fontSize: 16, fontWeight: 'bold', color: '#1890ff'}}>
                 <TrophyOutlined /> BẢNG THEO DÕI THI ĐUA THÁNG {currentMonth}/{currentYear}
             </div>
+            <Tooltip title={`Target Ngày được tính bằng (Target Tháng x 120%) / ${daysInMonth} ngày`}>
+                <InfoCircleOutlined style={{color: '#888', fontSize: 16}} />
+            </Tooltip>
         </div>
     );
 
@@ -831,7 +886,7 @@ function CompetitionTable() {
                     <Input.TextArea
                         rows={6}
                         placeholder={`Dán dữ liệu thi đua thô (Ngành hàng, Thực hiện, Target, % HT Dự kiến...) vào đây. 
-Code sẽ tự động tìm kiếm các cột: Tên (Ngành hàng), Thực hiện (DT QĐ/LK), Target (Mục tiêu) và % HT Dự kiến.
+Code sẽ tự động tìm kiếm các cột: Tên (Ngành hàng), Thực hiện (DT QĐ/LK hoặc SL), Target (Mục tiêu) và % HT Dự kiến.
 Bạn có thể dán nhiều khối dữ liệu vào cùng lúc.`}
                         value={rawDataInput}
                         onChange={(e) => setRawDataInput(e.target.value)}
@@ -859,15 +914,22 @@ Bạn có thể dán nhiều khối dữ liệu vào cùng lúc.`}
 
 
 // ==========================================
-// 5. MAIN COMPONENT (FINAL - GIỮ NGUYÊN)
+// 5. MAIN COMPONENT (ĐÃ CẬP NHẬT LỌC CỐ ĐỊNH HÌNH THỨC XUẤT)
 // ==========================================
 
 export default function ExcelDashboard() {
     const [allData, setAllData] = useState([]); 
-    const [filters, setFilters] = useState({ creators: [], statuses: [], dateRange: [], keyword: '' });
+    const [filters, setFilters] = useState({ 
+      creators: [], 
+      statuses: [], 
+      exportTypes: [], 
+      returnStatuses: [], 
+      dateRange: [], 
+      keyword: '' 
+    });
     const [stats, setStats] = useState({ 
         totalRevenue: 0, totalQuantity: 0, totalConvertedRevenue: 0,
-        conversionEfficiency: 0, installmentRate: 0, installmentCount: 0,
+        conversionEfficiency: 0, installmentRate: 0, installmentCount: 0, totalContracts: 0,
     });
     const [industryData, setIndustryData] = useState([]);
     const [staffData, setStaffData] = useState([]);
@@ -881,6 +943,20 @@ export default function ExcelDashboard() {
 
     const uniqueStatuses = useMemo(() => {
         const list = allData.map(item => item.trangThaiXuat).filter(Boolean);
+        return [...new Set(list)].sort();
+    }, [allData]);
+    
+    // Tạo danh sách duy nhất cho các bộ lọc Hình thức xuất. 
+    // CHỈ LẤY những giá trị nằm trong danh sách cố định (ALLOWED_EXPORT_TYPES)
+    const uniqueExportTypes = useMemo(() => {
+        const list = allData
+            .map(item => item.hinhThucXuat)
+            .filter(hinhThuc => ALLOWED_EXPORT_TYPES.includes(hinhThuc));
+        return [...new Set(list)].sort();
+    }, [allData]);
+
+    const uniqueReturnStatuses = useMemo(() => {
+        const list = allData.map(item => item.tinhTrangNhapTra).filter(Boolean);
         return [...new Set(list)].sort();
     }, [allData]);
 
@@ -908,8 +984,11 @@ export default function ExcelDashboard() {
                 doanhThu: Number(row['Phải thu']) || 0,
                 loaiYCX: row['Loại YCX'] || "",
                 trangThaiXuat: row['Trạng thái xuất'] || "",
+                hinhThucXuat: row['Hình thức xuất'] || "", // Lấy cột Hình thức xuất
+                tinhTrangNhapTra: row['Tình trạng nhập trả của sản phẩm đối với sản phẩm chính'] || "", // Lấy cột Tình trạng nhập trả
                 tenSP: row['Tên sản phẩm'] || "",
                 maDonHang: row['Mã đơn hàng'] || "",
+                // Đảm bảo lấy Ngày tạo từ file excel và chuyển thành đối tượng moment
                 ngayTao: row['Ngày tạo'] ? moment(row['Ngày tạo']) : null 
             }));
             setAllData(mappedData);
@@ -922,23 +1001,47 @@ export default function ExcelDashboard() {
     const filteredData = useMemo(() => {
         if (allData.length === 0) return [];
         return allData.filter(item => {
+            
+            // ⭐️ BƯỚC LỌC CỐ ĐỊNH: CHỈ LẤY CÁC HÌNH THỨC XUẤT ĐƯỢC CHỌN TRƯỚC
+            // Đây là điều kiện BẮT BUỘC, đảm bảo dữ liệu chỉ hiển thị các hình thức có tick xanh
+            const isAllowedExportTypeFixed = ALLOWED_EXPORT_TYPES.includes(item.hinhThucXuat);
+            if (!isAllowedExportTypeFixed) return false;
+            // ⭐️ KẾT THÚC BƯỚC LỌC CỐ ĐỊNH
+
             const matchCreator = filters.creators.length === 0 || filters.creators.includes(item.nguoiTao);
             const matchStatus = filters.statuses.length === 0 || filters.statuses.includes(item.trangThaiXuat);
+            
+            // Lọc theo Hình thức xuất (Áp dụng bộ lọc người dùng trên tập đã lọc cố định)
+            const matchExportType = filters.exportTypes.length === 0 || filters.exportTypes.includes(item.hinhThucXuat);
+            // Lọc theo Tình trạng nhập trả
+            const matchReturnStatus = filters.returnStatuses.length === 0 || filters.returnStatuses.includes(item.tinhTrangNhapTra);
+            
             const keyword = filters.keyword ? filters.keyword.toLowerCase() : '';
             const matchKeyword = !keyword || item.tenSP.toString().toLowerCase().includes(keyword) || item.maDonHang.toString().toLowerCase().includes(keyword);
+            
             let matchDate = true;
             if (filters.dateRange && filters.dateRange.length === 2 && item.ngayTao) {
                 const start = filters.dateRange[0].startOf('day');
                 const end = filters.dateRange[1].endOf('day');
                 matchDate = item.ngayTao.isBetween(start, end, null, '[]');
             }
-            return matchCreator && matchStatus && matchKeyword && matchDate;
+            
+            // Kết hợp tất cả các điều kiện lọc còn lại
+            return matchCreator && matchStatus && matchExportType && matchReturnStatus && matchKeyword && matchDate;
         });
     }, [allData, filters]);
 
     useEffect(() => {
         if (filteredData.length > 0) {
             processStatistics(filteredData);
+        } else {
+             // Reset stats if no data
+            setStats({ 
+                totalRevenue: 0, totalQuantity: 0, totalConvertedRevenue: 0,
+                conversionEfficiency: 0, installmentRate: 0, installmentCount: 0, totalContracts: 0,
+            });
+            setIndustryData([]);
+            setStaffData([]);
         }
     }, [filteredData]);
 
@@ -1005,7 +1108,8 @@ export default function ExcelDashboard() {
         })).sort((a, b) => b.doanhThu - a.doanhThu);
 
         const efficiency = totalRev > 0 ? ((totalConvertedRev - totalRev) / totalRev) * 100 : 0;
-        const installmentRate = data.length > 0 ? (installmentCount / data.length) * 100 : 0;
+        const totalContracts = data.length;
+        const installmentRate = totalContracts > 0 ? (installmentCount / totalContracts) * 100 : 0;
 
         const finalStaffData = Object.values(staffMap).map(st => ({
             ...st,
@@ -1019,7 +1123,7 @@ export default function ExcelDashboard() {
             conversionEfficiency: parseFloat(efficiency.toFixed(2)),
             installmentRate: parseFloat(installmentRate.toFixed(2)),
             installmentCount: installmentCount,
-            totalContracts: data.length,
+            totalContracts: totalContracts,
         });
 
         setIndustryData(finalIndustryData);
@@ -1027,7 +1131,7 @@ export default function ExcelDashboard() {
     };
 
     const handleResetFilters = () => {
-        setFilters({ creators: [], statuses: [], dateRange: [], keyword: '' });
+        setFilters({ creators: [], statuses: [], exportTypes: [], returnStatuses: [], dateRange: [], keyword: '' });
     };
 
     const withCaptureButton = (Component, id, title) => {
@@ -1071,7 +1175,15 @@ export default function ExcelDashboard() {
             </div>
 
             <Spin spinning={loading} tip="Đang xử lý dữ liệu..." size="large">
-                <FilterPanel creators={uniqueCreators} statuses={uniqueStatuses} filters={filters} setFilters={setFilters} onReset={handleResetFilters} />
+                <FilterPanel 
+                    creators={uniqueCreators} 
+                    statuses={uniqueStatuses} 
+                    exportTypes={uniqueExportTypes} 
+                    returnStatuses={uniqueReturnStatuses} 
+                    filters={filters} 
+                    setFilters={setFilters} 
+                    onReset={handleResetFilters} 
+                />
 
                 {allData.length > 0 ? (
                     <>
