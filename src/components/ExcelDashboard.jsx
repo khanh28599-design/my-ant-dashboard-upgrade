@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
-import { Row, Col, Card, Button, Select, DatePicker, Input, Table, Tabs, Tag, Space, Spin, message, Progress, Popover, Checkbox, Divider, Tooltip } from "antd";
+import Tesseract from 'tesseract.js'; 
+import { Row, Col, Card, Button, Select, DatePicker, Input, Table, Tabs, Tag, Space, Spin, message, Progress, Popover, Checkbox, Divider, Tooltip, Upload } from "antd";
 import {
   ReloadOutlined,
   PlusOutlined,
@@ -21,7 +22,9 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   CameraOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  UploadOutlined,
+  ScanOutlined
 } from "@ant-design/icons";
 import moment from "moment";
 import html2canvas from 'html2canvas';
@@ -49,7 +52,6 @@ const gradientText = {
 
 const formatMoneyShort = (amount) => {
   if (!amount) return "0";
-  // Xử lý tiền tệ lớn, đảm bảo tính toán luôn trên giá trị tuyệt đối, sau đó áp dụng dấu.
   const absAmount = Math.abs(amount);
   const sign = amount < 0 ? "-" : "";
 
@@ -60,14 +62,11 @@ const formatMoneyShort = (amount) => {
 };
 
 // ==========================================
-// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH (CÓ THÊM LỌC HÌNH THỨC XUẤT)
+// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH
 // ==========================================
 
-// Whitelist IDs (Giữ nguyên)
 const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664"];
 
-// Danh sách cố định các Hình thức xuất được tick xanh từ ảnh người dùng
-// Dữ liệu sẽ CHỈ LẤY các dòng có Hình thức xuất trong danh sách này.
 const ALLOWED_EXPORT_TYPES = [
     "Xuất bán ưu đãi cho nhân viên",
     "Xuất đổi bảo hành sản phẩm IMEI",
@@ -113,7 +112,6 @@ const getConversionCoefficient = (industryStr, groupStr) => {
     return 1.0;
 };
 
-// HÀM CHỤP HÌNH TABLE (Giữ nguyên)
 const captureTable = async (elementId, filename) => {
     const input = document.getElementById(elementId);
     if (!input) {
@@ -123,7 +121,7 @@ const captureTable = async (elementId, filename) => {
 
     try {
         const canvas = await html2canvas(input, {
-            scale: 2, // Tăng độ phân giải
+            scale: 2,
             useCORS: true, 
         });
 
@@ -141,7 +139,7 @@ const captureTable = async (elementId, filename) => {
 };
 
 // ==========================================
-// 1. COMPONENT BỘ LỌC TỔNG (GIỮ NGUYÊN)
+// 1. COMPONENT BỘ LỌC TỔNG
 // ==========================================
 
 function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters, setFilters, onReset }) {
@@ -232,17 +230,52 @@ function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters,
 }
 
 // ==========================================
-// 2. CÁC COMPONENT HIỂN THỊ OVERVIEW (GIỮ NGUYÊN)
+// 2. CÁC COMPONENT HIỂN THỊ OVERVIEW (CẬP NHẬT TARGET & TỶ LỆ GÓP)
 // ==========================================
 
 function OverviewSection({ stats }) {
   const EffIcon = stats.conversionEfficiency >= 0 ? ArrowUpOutlined : ArrowDownOutlined;
 
+  // Target Cố định
+  const TARGET_REAL = 3800000000; // 3.8 Tỷ
+  const TARGET_CONVERTED = 4770000000; // 4.77 Tỷ
+
+  // Tính % Hoàn thành
+  const percentReal = (stats.totalRevenue / TARGET_REAL) * 100;
+  const percentConverted = (stats.totalConvertedRevenue / TARGET_CONVERTED) * 100;
+
   const cards = [
-    { title: "TỔNG DOANH THU THỰC", value: formatMoneyShort(stats.totalRevenue), sub: `SL: ${stats.totalQuantity}`, icon: <FundOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)" },
-    { title: "TỔNG DOANH THU QUY ĐỔI", value: formatMoneyShort(stats.totalConvertedRevenue), sub: "DTQĐ = DT * Hệ số", icon: <RiseOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)" },
-    { title: "HIỆU QUẢ QĐ (TỈ TRỌNG)", value: `${stats.conversionEfficiency > 0 ? '+' : ''}${stats.conversionEfficiency}%`, sub: "(DTQĐ - DT) / DT", icon: <EffIcon style={{fontSize: 24, color: "#fff"}}/>, background: stats.conversionEfficiency >= 0 ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)" : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)" },
-    { title: "TỶ LỆ TRẢ GÓP", value: stats.installmentRate + "%", sub: `SL HĐ: ${stats.totalContracts > 0 ? (stats.installmentCount / stats.totalContracts * 100).toFixed(1) : 0}%`, icon: <PieChartOutlined style={{fontSize: 24, color: "#fff"}}/>, background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)" }
+    { 
+        title: "TỔNG DOANH THU THỰC", 
+        value: formatMoneyShort(stats.totalRevenue), 
+        // Hiển thị % so với Target 3.8 Tỷ
+        sub: `Đạt ${percentReal.toFixed(1)}% (MT: 3.8 Tỷ)`, 
+        icon: <FundOutlined style={{fontSize: 24, color: "#fff"}}/>, 
+        background: "linear-gradient(135deg, #3C8CE7 10%, #00EAFF 100%)" 
+    },
+    { 
+        title: "TỔNG DOANH THU QUY ĐỔI", 
+        value: formatMoneyShort(stats.totalConvertedRevenue), 
+        // Hiển thị % so với Target 4.77 Tỷ
+        sub: `Đạt ${percentConverted.toFixed(1)}% (MT: 4.77 Tỷ)`, 
+        icon: <RiseOutlined style={{fontSize: 24, color: "#fff"}}/>, 
+        background: "linear-gradient(135deg, #667eea 10%, #764ba2 100%)" 
+    },
+    { 
+        title: "HIỆU QUẢ QĐ (TỈ TRỌNG)", 
+        value: `${stats.conversionEfficiency > 0 ? '+' : ''}${stats.conversionEfficiency}%`, 
+        sub: "(DTQĐ - DT) / DT", 
+        icon: <EffIcon style={{fontSize: 24, color: "#fff"}}/>, 
+        background: stats.conversionEfficiency >= 0 ? "linear-gradient(135deg, #11998e 10%, #38ef7d 100%)" : "linear-gradient(135deg, #FF416C 10%, #FF4B2B 100%)" 
+    },
+    { 
+        title: "TỶ LỆ GÓP (THEO DT)", 
+        value: stats.installmentRate + "%", 
+        // Hiển thị Doanh thu Góp thay vì số lượng
+        sub: `DT Góp: ${formatMoneyShort(stats.installmentRevenue)}`, 
+        icon: <PieChartOutlined style={{fontSize: 24, color: "#fff"}}/>, 
+        background: "linear-gradient(135deg, #f2709c 10%, #ff9472 100%)" 
+    }
   ];
 
   return (
@@ -317,7 +350,7 @@ function StaffHorizontalChart({ staffData }) {
 }
 
 // ==========================================
-// 3. CÁC BẢNG CHI TIẾT (GIỮ NGUYÊN)
+// 3. CÁC BẢNG CHI TIẾT
 // ==========================================
 
 function TopStaffRanking({ staffData, totalRevenue }) {
@@ -329,8 +362,8 @@ function TopStaffRanking({ staffData, totalRevenue }) {
         pagination={{ pageSize: 10 }}
         size="small"
         rowKey="key"
-        scroll={{ x: 'max-content' }} // Tối ưu hiển thị ngang
-        style={{ fontSize: '12px' }} // Thu nhỏ chữ
+        scroll={{ x: 'max-content' }}
+        style={{ fontSize: '12px' }}
         columns={[
           {title: "#", render: (text, record, index) => index + 1, width: 50, align: 'center'},
           {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: "#1890ff", fontSize: 12}}>{txt}</b>},
@@ -350,7 +383,7 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
     const searchInput = useRef(null);
     const [selectedIndustries, setSelectedIndustries] = useState([]);
     const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
-    const [checkedList, setCheckedList] = defaultCheckedList;
+    const [checkedList, setCheckedList] = useState(defaultCheckedList);
     
     const industryOptions = useMemo(() => {
         return industryData.filter(item => !item.isChild).map(item => item.name).sort();
@@ -507,13 +540,13 @@ function DetailIndustryTable({ industryData, totalRevenue, creators, filters, se
         <Table 
             columns={visibleColumns} 
             dataSource={dataSource} 
-            scroll={{x: 'max-content', y: 500}} // Tối ưu hiển thị ngang
+            scroll={{x: 'max-content', y: 500}} 
             pagination={false} 
             size="small" 
             rowKey="key" 
             bordered 
             expandable={{defaultExpandAllRows: false}}
-            style={{ fontSize: '12px' }} // Thu nhỏ chữ
+            style={{ fontSize: '12px' }}
         />
     </Card>
   );
@@ -628,44 +661,69 @@ function StaffAvgPriceTable({ rawData }) {
       <Table
         dataSource={dataSource} 
         columns={columns} 
-        scroll={{ x: 'max-content', y: 500 }} // Tối ưu hiển thị ngang
+        scroll={{ x: 'max-content', y: 500 }}
         pagination={{ pageSize: 10 }} 
         bordered 
         size="small" 
-        style={{ fontSize: '12px' }} // Thu nhỏ chữ
+        style={{ fontSize: '12px' }}
       />
     </Card>
   );
 }
 
 // ==========================================
-// 4. COMPONENT BẢNG THI ĐUA (CẬP NHẬT LOGIC LỌC TỐT HƠN)
+// 4. COMPONENT BẢNG THI ĐUA (CÓ OCR ẢNH)
 // ==========================================
 function CompetitionTable() {
     const [rawDataInput, setRawDataInput] = useState("");
     const [tableData, setTableData] = useState([]);
+    const [ocrLoading, setOcrLoading] = useState(false);
+    const [ocrProgress, setOcrProgress] = useState(0);
     
-    // Lấy thông tin tháng hiện tại
     const daysInMonth = moment().daysInMonth();
-    const currentMonth = moment().month() + 1; // 1-12
+    const currentMonth = moment().month() + 1; 
     const currentYear = moment().year();
 
     const tableRef = useRef(null);
     
-    // Hàm chuẩn hóa tiêu đề và tìm kiếm cột (CẬP NHẬT)
-    const findColumnIndices = (headerLine) => {
-        const headers = headerLine.split('\t').map(h => h.trim().toLowerCase().replace(/[^a-z0-9%]/g, ''));
+    // Hàm xử lý ảnh OCR (MỚI)
+    const handleImageUpload = (file) => {
+        setOcrLoading(true);
+        setOcrProgress(0);
         
-        // Từ khóa tìm kiếm cho 4 cột bắt buộc (Ưu tiên tìm kiếm khớp)
-        const nameKeywords = ['nganhhang', 'ten', 'nhom', 'mat hang']; // Tên
-        // DTQD (Doanh thu quy đổi) hoặc SL (Số lượng) hoặc ThucHien
+        Tesseract.recognize(
+            file,
+            'vie', // Sử dụng tiếng Việt
+            { 
+                logger: m => {
+                    if(m.status === 'recognizing text') {
+                        setOcrProgress(Math.floor(m.progress * 100));
+                    }
+                }
+            }
+        ).then(({ data: { text } }) => {
+            setRawDataInput(text); // Đưa text vào xử lý
+            setOcrLoading(false);
+            message.success("Đã quét dữ liệu từ ảnh thành công!");
+        }).catch(err => {
+            console.error(err);
+            message.error("Lỗi khi quét ảnh. Vui lòng thử lại với ảnh rõ nét hơn.");
+            setOcrLoading(false);
+        });
+        
+        return false; // Ngăn upload mặc định
+    };
+
+    const findColumnIndices = (headerLine) => {
+        const headers = headerLine.split(/[\t]|\s{2,}/).map(h => h.trim().toLowerCase().replace(/[^a-z0-9%]/g, ''));
+        
+        const nameKeywords = ['nganhhang', 'ten', 'nhom', 'mat hang'];
         const thucHienKeywords = ['dtqd', 'dtlk', 'thuchien', 'datduoc', 'sl', 'sllk']; 
-        const targetKeywords = ['target', 'muctieu', 'mt']; // Target
-        const percentKeywords = ['%htdukien', '%hoanthanh']; // % HT Dự kiến
+        const targetKeywords = ['target', 'muctieu', 'mt'];
+        const percentKeywords = ['%htdukien', '%hoanthanh'];
 
         const indices = {};
         
-        // Tìm cột Tên (ưu tiên tìm thấy đầu tiên)
         for (let keyword of nameKeywords) {
             const index = headers.findIndex(h => h.includes(keyword));
             if (index !== -1) {
@@ -674,7 +732,6 @@ function CompetitionTable() {
             }
         }
         
-        // Tìm các cột còn lại (cần phải phân biệt với cột Tên)
         for (let keyword of thucHienKeywords) {
             const index = headers.findIndex(h => h.includes(keyword));
             if (index !== -1 && index !== indices.nameIndex) {
@@ -698,31 +755,20 @@ function CompetitionTable() {
                 break;
             }
         }
-        
         return indices;
     };
 
-    // Hàm kiểm tra xem một dòng có phải là dòng tiêu đề không (dựa trên từ khóa và số cột)
     const isHeaderLine = (line) => {
         const normalizedLine = line.trim().toLowerCase();
-        // Cần có ít nhất 2 trong 4 từ khóa này để xác định là tiêu đề
         const headerKeywords = ['nganhhang', 'dtqd', 'target', '%ht', 'sl'];
         const matches = headerKeywords.filter(kw => normalizedLine.includes(kw));
         return matches.length >= 2;
     };
 
-    // Hàm chuyển đổi sang số (CẬP NHẬT LOGIC LÀM SẠCH VÀ CHUYỂN ĐỔI)
     const convertToNumber = (str) => {
         if (!str) return 0;
         let cleaned = str.toString().trim();
-        
-        // Xóa các ký tự không phải số, dấu phẩy (thập phân), hoặc dấu chấm (ngàn/triệu)
-        // Lưu ý: Dữ liệu bạn cung cấp dùng dấu chấm là dấu phân cách thập phân (ví dụ: 950.42), nên ta sẽ giữ lại dấu chấm
         cleaned = cleaned.replace(/[^\d\.]/g, ''); 
-        
-        // Nếu số quá lớn (dùng dấu phẩy hoặc chấm để phân cách hàng ngàn), code sẽ không tự xử lý được.
-        // Với dữ liệu đầu vào là 950.421,683.80, ta coi đây là 950.421 và 683.80.
-        // Nếu dữ liệu là 950.42, hàm parse sẽ hiểu là 950.42
         return parseFloat(cleaned) || 0; 
     };
 
@@ -732,7 +778,9 @@ function CompetitionTable() {
             return;
         }
 
-        const lines = dataInput.trim().split('\n').map(line => line.trim()).filter(line => line);
+        // Tách dòng: Chấp nhận cả xuống dòng đơn thuần
+        const lines = dataInput.split(/\r?\n/).map(line => line.trim()).filter(line => line);
+        
         if (lines.length < 2) {
             setTableData([]);
             return;
@@ -740,94 +788,70 @@ function CompetitionTable() {
         
         const results = [];
         let currentIndices = null;
-        let blockKey = 0; // Chỉ mục để phân biệt các khối dữ liệu
-        
-        // Danh sách các tên đã được thêm vào để tránh trùng lặp
+        let blockKey = 0;
         const addedNames = new Set();
 
-        // Lặp qua từng dòng dữ liệu
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            const parts = line.split('\t').map(p => p.trim());
+            // Tách cột: Chấp nhận Tab HOẶC 2 khoảng trắng trở lên (do OCR thường sinh ra khoảng trắng)
+            const parts = line.split(/[\t]|\s{2,}/).map(p => p.trim());
             
-            // 1. Kiểm tra nếu là dòng tiêu đề mới
             if (isHeaderLine(line)) {
                 const indices = findColumnIndices(line);
-                
-                // Nếu tìm thấy Tên và Target, đây là tiêu đề hợp lệ
                 if (indices.nameIndex !== undefined && indices.targetIndex !== undefined) {
                     currentIndices = indices;
                     blockKey++;
-                    continue; // Bỏ qua dòng tiêu đề
+                    continue; 
                 }
             } 
             
-            // 2. Xử lý dòng dữ liệu (nếu đã có bộ chỉ mục)
             if (currentIndices && currentIndices.nameIndex !== undefined && currentIndices.targetIndex !== undefined) {
-                
-                // Kiểm tra nếu là dòng Tổng Cộng hoặc dòng tiêu đề bị lặp
                 const nameCandidate = (parts[currentIndices.nameIndex] || '').toLowerCase();
                 if (nameCandidate.includes('tổng') || nameCandidate.includes('total') || nameCandidate.includes('sum') || nameCandidate.includes('ngành hàng')) {
                     continue; 
                 }
                 
-                // Dữ liệu hợp lệ (phải có đủ số phần tử cho các chỉ mục đã tìm)
                 if (parts.length > Math.max(currentIndices.nameIndex, currentIndices.thucHienIndex || 0, currentIndices.targetIndex, currentIndices.percentIndex || 0)) {
                     
                     const name = parts[currentIndices.nameIndex] || '';
-                    if (!name || addedNames.has(name)) continue; // Bỏ qua nếu tên trống hoặc đã xử lý trong khối trước
+                    if (!name || addedNames.has(name)) continue; 
 
-                    // Lấy giá trị từ chỉ mục đã tìm được
                     const thucHienStr = currentIndices.thucHienIndex !== undefined ? parts[currentIndices.thucHienIndex] : '0';
                     const targetStr = currentIndices.targetIndex !== undefined ? parts[currentIndices.targetIndex] : '0';
                     
                     const thucHien = convertToNumber(thucHienStr);
                     const target = convertToNumber(targetStr);
                     
-                    // Lọc: Bỏ qua nếu cả Thực hiện và Target đều bằng 0
                     if (target === 0 && thucHien === 0) continue; 
                     
-                    addedNames.add(name); // Thêm tên vào danh sách đã xử lý
+                    addedNames.add(name);
 
                     let percentHT = '';
                     if (currentIndices.percentIndex !== undefined) {
-                        // Lấy giá trị % từ cột gốc
                         percentHT = (parts[currentIndices.percentIndex] || '-').toString().trim();
                         if (!percentHT.includes('%')) {
-                            // Xử lý trường hợp giá trị là 0.5324 thay vì 53.24%
                             const val = convertToNumber(percentHT);
                             percentHT = (val * 100).toFixed(2) + '%'; 
                         }
                     } else {
-                        // Tự tính nếu không có cột % HT
                         percentHT = target > 0 ? ((thucHien / target) * 100).toFixed(2) + '%' : '-';
                     }
                     
-                    // CÔNG THỨC MỚI: (Target * 120%) / Số ngày trong tháng
-                    // Target ở đây là đơn vị Triệu (hoặc Số lượng). 
-                    // Để tính Target Ngày (tiền), ta nhân Target với 1.2 (120%) và chia cho số ngày.
                     const targetNgay = (target * 1.2) / daysInMonth; 
 
-                    // Format hiển thị (đơn vị Triệu đồng, nếu thucHien/target > 100 thì coi là Triệu)
-                    // Vì dữ liệu bạn dán là 950.42 (Triệu), nên ta coi target/thucHien là đơn vị Triệu rồi
-                    // Chỉ nhân 1000000 khi format để hiển thị đủ "Tr"
-                    
                     results.push({
                         key: `${name}-${i}-${blockKey}`,
                         name: name,
-                        thucHien: thucHien, // Đơn vị Triệu/SL
-                        target: target, // Đơn vị Triệu/SL
+                        thucHien: thucHien,
+                        target: target,
                         percentHT: percentHT,
-                        targetNgay: targetNgay, // Đơn vị Triệu/SL
-                        formattedTargetNgay: formatMoneyShort(targetNgay * 1000000), // Format hiển thị tiền
+                        targetNgay: targetNgay,
+                        formattedTargetNgay: formatMoneyShort(targetNgay * 1000000),
                     });
                 }
             }
         }
         
-        if (results.length === 0 && dataInput.trim().length > 0) {
-             message.warning("Đã xử lý dữ liệu, nhưng không tìm thấy dòng dữ liệu hợp lệ (có Tên và Target) nào. Vui lòng đảm bảo các cột Tên, Thực hiện, Target được dán chính xác.");
-        }
         setTableData(results);
     }, [daysInMonth]);
 
@@ -841,11 +865,11 @@ function CompetitionTable() {
         },
         { title: "Thực Hiện", dataIndex: "thucHien", key: "thucHien", align: 'right', width: 120,
             sorter: (a, b) => a.thucHien - b.thucHien,
-            render: (val) => val.toLocaleString('vi-VN') + (val > 100 ? ' Tr' : '') // Ước tính nếu giá trị lớn thì là Triệu
+            render: (val) => val.toLocaleString('vi-VN') + (val > 100 ? ' Tr' : '')
         },
         { title: "Target Tháng", dataIndex: "target", key: "target", align: 'right', width: 150,
             sorter: (a, b) => a.target - b.target, 
-            render: (val) => val.toLocaleString('vi-VN') + (val > 100 ? ' Tr' : '') // Ước tính nếu giá trị lớn thì là Triệu
+            render: (val) => val.toLocaleString('vi-VN') + (val > 100 ? ' Tr' : '')
         },
         { title: "Target Ngày (x120%)", dataIndex: "targetNgay", key: "targetNgay", align: 'right', width: 180,
             sorter: (a, b) => a.targetNgay - b.targetNgay,
@@ -864,7 +888,6 @@ function CompetitionTable() {
         },
     ];
 
-    // Tạo tiêu đề thi đua hiển thị 1 lần duy nhất ở trên
     const competitionHeader = (
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
             <div style={{fontSize: 16, fontWeight: 'bold', color: '#1890ff'}}>
@@ -876,21 +899,30 @@ function CompetitionTable() {
         </div>
     );
 
-
     return (
         <Card style={cardStyle} bodyStyle={{padding: 20}}>
             {competitionHeader}
             
-            <Row gutter={[16, 16]}>
+            <Row gutter={[16, 16]} align="middle">
                 <Col span={24}>
+                    <Upload 
+                        accept="image/*"
+                        showUploadList={false}
+                        beforeUpload={handleImageUpload}
+                    >
+                        <Button icon={<ScanOutlined />} type="primary" loading={ocrLoading} style={{marginBottom: 10}}>
+                            {ocrLoading ? "Đang quét ảnh..." : "Tải Ảnh Báo Cáo (OCR)"}
+                        </Button>
+                    </Upload>
+                    {ocrLoading && <Progress percent={ocrProgress} size="small" status="active" />}
+                    
+                    {/* Vẫn giữ textarea ẩn hoặc nhỏ để debug nếu cần, hoặc hiển thị kết quả text raw */}
                     <Input.TextArea
-                        rows={6}
-                        placeholder={`Dán dữ liệu thi đua thô (Ngành hàng, Thực hiện, Target, % HT Dự kiến...) vào đây. 
-Code sẽ tự động tìm kiếm các cột: Tên (Ngành hàng), Thực hiện (DT QĐ/LK hoặc SL), Target (Mục tiêu) và % HT Dự kiến.
-Bạn có thể dán nhiều khối dữ liệu vào cùng lúc.`}
+                        rows={4}
+                        placeholder="Dữ liệu quét được sẽ hiện ở đây..."
                         value={rawDataInput}
                         onChange={(e) => setRawDataInput(e.target.value)}
-                        style={{fontFamily: 'monospace'}}
+                        style={{fontFamily: 'monospace', fontSize: 11, color: '#666', marginTop: 10}}
                     />
                 </Col>
             </Row>
@@ -905,16 +937,15 @@ Bạn có thể dán nhiều khối dữ liệu vào cùng lúc.`}
                     size="small"
                     rowKey="key"
                     bordered
-                    scroll={{ x: 'max-content' }} // Tối ưu hiển thị ngang
+                    scroll={{ x: 'max-content' }} 
                 />
             </div>
         </Card>
     );
 }
 
-
 // ==========================================
-// 5. MAIN COMPONENT (ĐÃ CẬP NHẬT LỌC CỐ ĐỊNH HÌNH THỨC XUẤT)
+// 5. MAIN COMPONENT (CẬP NHẬT TARGET VÀ TỶ LỆ GÓP)
 // ==========================================
 
 export default function ExcelDashboard() {
@@ -929,7 +960,7 @@ export default function ExcelDashboard() {
     });
     const [stats, setStats] = useState({ 
         totalRevenue: 0, totalQuantity: 0, totalConvertedRevenue: 0,
-        conversionEfficiency: 0, installmentRate: 0, installmentCount: 0, totalContracts: 0,
+        conversionEfficiency: 0, installmentRate: 0, installmentCount: 0, totalContracts: 0, installmentRevenue: 0
     });
     const [industryData, setIndustryData] = useState([]);
     const [staffData, setStaffData] = useState([]);
@@ -946,8 +977,6 @@ export default function ExcelDashboard() {
         return [...new Set(list)].sort();
     }, [allData]);
     
-    // Tạo danh sách duy nhất cho các bộ lọc Hình thức xuất. 
-    // CHỈ LẤY những giá trị nằm trong danh sách cố định (ALLOWED_EXPORT_TYPES)
     const uniqueExportTypes = useMemo(() => {
         const list = allData
             .map(item => item.hinhThucXuat)
@@ -984,11 +1013,10 @@ export default function ExcelDashboard() {
                 doanhThu: Number(row['Phải thu']) || 0,
                 loaiYCX: row['Loại YCX'] || "",
                 trangThaiXuat: row['Trạng thái xuất'] || "",
-                hinhThucXuat: row['Hình thức xuất'] || "", // Lấy cột Hình thức xuất
-                tinhTrangNhapTra: row['Tình trạng nhập trả của sản phẩm đối với sản phẩm chính'] || "", // Lấy cột Tình trạng nhập trả
+                hinhThucXuat: row['Hình thức xuất'] || "", 
+                tinhTrangNhapTra: row['Tình trạng nhập trả của sản phẩm đối với sản phẩm chính'] || "",
                 tenSP: row['Tên sản phẩm'] || "",
                 maDonHang: row['Mã đơn hàng'] || "",
-                // Đảm bảo lấy Ngày tạo từ file excel và chuyển thành đối tượng moment
                 ngayTao: row['Ngày tạo'] ? moment(row['Ngày tạo']) : null 
             }));
             setAllData(mappedData);
@@ -1002,18 +1030,13 @@ export default function ExcelDashboard() {
         if (allData.length === 0) return [];
         return allData.filter(item => {
             
-            // ⭐️ BƯỚC LỌC CỐ ĐỊNH: CHỈ LẤY CÁC HÌNH THỨC XUẤT ĐƯỢC CHỌN TRƯỚC
-            // Đây là điều kiện BẮT BUỘC, đảm bảo dữ liệu chỉ hiển thị các hình thức có tick xanh
             const isAllowedExportTypeFixed = ALLOWED_EXPORT_TYPES.includes(item.hinhThucXuat);
             if (!isAllowedExportTypeFixed) return false;
-            // ⭐️ KẾT THÚC BƯỚC LỌC CỐ ĐỊNH
 
             const matchCreator = filters.creators.length === 0 || filters.creators.includes(item.nguoiTao);
             const matchStatus = filters.statuses.length === 0 || filters.statuses.includes(item.trangThaiXuat);
             
-            // Lọc theo Hình thức xuất (Áp dụng bộ lọc người dùng trên tập đã lọc cố định)
             const matchExportType = filters.exportTypes.length === 0 || filters.exportTypes.includes(item.hinhThucXuat);
-            // Lọc theo Tình trạng nhập trả
             const matchReturnStatus = filters.returnStatuses.length === 0 || filters.returnStatuses.includes(item.tinhTrangNhapTra);
             
             const keyword = filters.keyword ? filters.keyword.toLowerCase() : '';
@@ -1026,7 +1049,6 @@ export default function ExcelDashboard() {
                 matchDate = item.ngayTao.isBetween(start, end, null, '[]');
             }
             
-            // Kết hợp tất cả các điều kiện lọc còn lại
             return matchCreator && matchStatus && matchExportType && matchReturnStatus && matchKeyword && matchDate;
         });
     }, [allData, filters]);
@@ -1035,10 +1057,9 @@ export default function ExcelDashboard() {
         if (filteredData.length > 0) {
             processStatistics(filteredData);
         } else {
-             // Reset stats if no data
             setStats({ 
                 totalRevenue: 0, totalQuantity: 0, totalConvertedRevenue: 0,
-                conversionEfficiency: 0, installmentRate: 0, installmentCount: 0, totalContracts: 0,
+                conversionEfficiency: 0, installmentRate: 0, installmentCount: 0, totalContracts: 0, installmentRevenue: 0
             });
             setIndustryData([]);
             setStaffData([]);
@@ -1050,6 +1071,7 @@ export default function ExcelDashboard() {
         let totalQty = 0;
         let totalConvertedRev = 0;
         let installmentCount = 0;
+        let installmentRevenue = 0; // Biến mới để tính doanh thu góp
         
         const hierarchyMap = {};
         const staffMap = {};
@@ -1066,9 +1088,12 @@ export default function ExcelDashboard() {
             totalQty += qty;
             totalConvertedRev += convertedRev;
 
-            if (item.loaiYCX && item.loaiYCX.toLowerCase().includes("trả góp")) installmentCount++;
+            // CẬP NHẬT LOGIC TÍNH GÓP
+            if (item.loaiYCX && item.loaiYCX.toLowerCase().includes("trả góp")) {
+                installmentCount++;
+                installmentRevenue += rev; // Cộng dồn doanh thu đơn góp
+            }
 
-            // Hierarchy
             const parentKey = item.nganhHang || "Khác";
             const childKey = item.nhomHang || "Khác";
 
@@ -1092,7 +1117,6 @@ export default function ExcelDashboard() {
             hierarchyMap[parentKey].childrenMap[childKey].doanhThu += rev;
             hierarchyMap[parentKey].childrenMap[childKey].dtqd += convertedRev;
 
-            // Staff
             const staffKey = item.nguoiTao || "Unknown";
             if (!staffMap[staffKey]) {
                 staffMap[staffKey] = { name: staffKey, soLuong: 0, doanhThu: 0, dtqd: 0, bhRevenue: 0, key: staffKey };
@@ -1109,7 +1133,9 @@ export default function ExcelDashboard() {
 
         const efficiency = totalRev > 0 ? ((totalConvertedRev - totalRev) / totalRev) * 100 : 0;
         const totalContracts = data.length;
-        const installmentRate = totalContracts > 0 ? (installmentCount / totalContracts) * 100 : 0;
+        
+        // CÔNG THỨC TỶ LỆ GÓP MỚI: (DT Góp / Tổng DT) * 100
+        const installmentRate = totalRev > 0 ? (installmentRevenue / totalRev) * 100 : 0;
 
         const finalStaffData = Object.values(staffMap).map(st => ({
             ...st,
@@ -1123,6 +1149,7 @@ export default function ExcelDashboard() {
             conversionEfficiency: parseFloat(efficiency.toFixed(2)),
             installmentRate: parseFloat(installmentRate.toFixed(2)),
             installmentCount: installmentCount,
+            installmentRevenue: installmentRevenue, // Lưu doanh thu góp để hiển thị
             totalContracts: totalContracts,
         });
 
