@@ -34,12 +34,12 @@ const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
 // ==========================================
-// STYLES & HELPERS (CẬP NHẬT STYLES CHUYÊN NGHIỆP)
+// STYLES & HELPERS (GIỮ NGUYÊN TỪ PHIÊN TRƯỚC)
 // ==========================================
 const cardStyle = {
   borderRadius: 12,
-  boxShadow: "0 6px 18px rgba(0,0,0,0.1)", // Shadow sâu hơn
-  border: "1px solid #e8e8e8", // Thêm viền nhẹ
+  boxShadow: "0 6px 18px rgba(0,0,0,0.1)", 
+  border: "1px solid #e8e8e8", 
   overflow: "hidden"
 };
 
@@ -149,7 +149,7 @@ const captureTable = async (elementId, filename) => {
 };
 
 // ==========================================
-// COMPONENT BỘ LỌC TỔNG (ĐÃ CẬP NHẬT CHUYÊN NGHIỆP HƠN)
+// COMPONENT BỘ LỌC TỔNG (CẬP NHẬT: THÊM CHỌN TẤT CẢ)
 // ==========================================
 
 function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters, setFilters, onReset }) {
@@ -178,6 +178,36 @@ function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters,
       setFilters(prev => ({ ...prev, dateRange: start ? [start, end] : [] }));
   };
 
+  // NEW: Xử lý logic Chọn Tất Cả cho Select mode="multiple"
+  const handleMultiSelectChange = (key, availableList) => (selectedValues) => {
+      let finalSelection = selectedValues.filter(val => val !== 'all');
+
+      if (selectedValues.includes('all')) {
+           // Nếu người dùng chọn "all", đặt tất cả các giá trị có sẵn
+           finalSelection = availableList;
+      } else if (finalSelection.length === availableList.length) {
+          // Nếu người dùng chọn hết tất cả các tùy chọn con, coi như chọn tất cả
+          finalSelection = availableList;
+      }
+      
+      handleChange(key, finalSelection);
+  };
+
+  // Helper render Select với tùy chọn "Chọn Tất Cả"
+  const renderMultiSelect = (key, availableList, placeholder, maxTagCount) => (
+    <Select 
+        mode="multiple" allowClear placeholder={placeholder}
+        value={filters[key]} 
+        onChange={handleMultiSelectChange(key, availableList)}
+        size="large" style={{ width: "100%" }} showSearch optionFilterProp="children" maxTagCount={maxTagCount}
+    >
+        <Option key="all" value="all" style={{fontWeight: 700, color: PRIMARY_COLOR, borderBottom: '1px solid #eee'}}>
+            <CheckCircleOutlined /> Chọn Tất Cả
+        </Option>
+        {availableList.map(c => <Option key={c} value={c}>{c}</Option>)}
+    </Select>
+  );
+
   return (
     <Card 
         style={{ ...cardStyle, marginBottom: 20 }}
@@ -200,49 +230,25 @@ function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters,
         {/* 1. Người tạo */}
         <Col xs={24} sm={12} md={6} lg={3}>
           <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Người tạo</div>
-          <Select 
-            mode="multiple" allowClear placeholder="Chọn nhân viên..."
-            value={filters.creators} onChange={(val) => handleChange('creators', val)}
-            size="large" style={{ width: "100%" }} showSearch optionFilterProp="children" maxTagCount={1}
-          >
-            {creators.map(c => <Option key={c} value={c}>{c}</Option>)}
-          </Select>
+          {renderMultiSelect('creators', creators, "Chọn nhân viên...", 1)}
         </Col>
 
         {/* 2. Trạng thái xuất */}
         <Col xs={24} sm={12} md={6} lg={3}>
           <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Trạng thái xuất</div>
-          <Select 
-            mode="multiple" allowClear placeholder="Chọn trạng thái..."
-            value={filters.statuses} onChange={(val) => handleChange('statuses', val)}
-            size="large" style={{ width: "100%" }}
-          >
-            {statuses.map(s => <Option key={s} value={s}>{s}</Option>)}
-          </Select>
+          {renderMultiSelect('statuses', statuses, "Chọn trạng thái...", 1)}
         </Col>
 
         {/* 3. Hình thức xuất */}
         <Col xs={24} sm={12} md={6} lg={4}>
           <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Hình thức xuất</div>
-          <Select 
-            mode="multiple" allowClear placeholder="Chọn hình thức..."
-            value={filters.exportTypes} onChange={(val) => handleChange('exportTypes', val)}
-            size="large" style={{ width: "100%" }} maxTagCount={1}
-          >
-            {exportTypes.map(s => <Option key={s} value={s}>{s}</Option>)}
-          </Select>
+          {renderMultiSelect('exportTypes', exportTypes, "Chọn hình thức...", 1)}
         </Col>
 
         {/* 4. Tình trạng nhập trả */}
         <Col xs={24} sm={12} md={6} lg={4}>
           <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Tình trạng nhập trả</div>
-          <Select 
-            mode="multiple" allowClear placeholder="Chọn tình trạng..."
-            value={filters.returnStatuses} onChange={(val) => handleChange('returnStatuses', val)}
-            size="large" style={{ width: "100%" }}
-          >
-            {returnStatuses.map(s => <Option key={s} value={s}>{s}</Option>)}
-          </Select>
+          {renderMultiSelect('returnStatuses', returnStatuses, "Chọn tình trạng...", 1)}
         </Col>
 
         {/* 5. Lọc nhanh thời gian */}
@@ -394,7 +400,7 @@ function StaffHorizontalChart({ staffData }) {
 }
 
 // ==========================================
-// CÁC BẢNG CHI TIẾT (ĐÃ CẬP NHẬT MÀU SẮC CHO BẢNG)
+// CÁC BẢNG CHI TIẾT (GIỮ NGUYÊN)
 // ==========================================
 
 function TopStaffRanking({ staffData, totalRevenue }) {
@@ -424,7 +430,7 @@ function TopStaffRanking({ staffData, totalRevenue }) {
   );
 }
 
-// Bảng chi tiết Ngành hàng (Đã cập nhật màu sắc)
+// Bảng chi tiết Ngành hàng (Giữ nguyên)
 function DetailIndustryTable({ industryData, totalRevenue }) {
     const [selectedIndustries, setSelectedIndustries] = useState([]);
     const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
@@ -617,7 +623,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
   );
 }
 
-// Bảng đơn giá trung bình (Đã cập nhật màu sắc)
+// Bảng đơn giá trung bình (Giữ nguyên)
 function StaffAvgPriceTable({ rawData }) {
   const targetGroups = [
     { id: "1094", name: "Tivi LED (1094)", target: 9000000 },
@@ -738,7 +744,7 @@ function StaffAvgPriceTable({ rawData }) {
   );
 }
 
-// Bảng thi đua (Đã cập nhật màu sắc)
+// Bảng thi đua (Giữ nguyên)
 function CompetitionTable() {
     const [rawDataInput, setRawDataInput] = useState("");
     const [tableData, setTableData] = useState([]);
@@ -997,7 +1003,7 @@ function CompetitionTable() {
 }
 
 // ==========================================
-// 5. MAIN APP COMPONENT (GIỮ NGUYÊN LOGIC)
+// 5. MAIN APP COMPONENT (CẬP NHẬT LOGIC LỌC KHI LOAD FILE)
 // ==========================================
 
 export default function ExcelDashboard() {
@@ -1034,7 +1040,7 @@ export default function ExcelDashboard() {
   const [staffData, setStaffData] = useState([]);
 
   // ----------------------------------------
-  // HELPER: SMART MAPPING (TÌM CỘT THÔNG MINH)
+  // HELPER: SMART MAPPING (GIỮ NGUYÊN)
   // ----------------------------------------
   const identifyColumn = (headers, keys) => {
      // 1. Tìm chính xác
@@ -1051,7 +1057,7 @@ export default function ExcelDashboard() {
   };
 
   // ----------------------------------------
-  // FILE HANDLING 
+  // FILE HANDLING (CẬP NHẬT: THÊM LOGIC BẢO TOÀN LỰA CHỌN FILTER)
   // ----------------------------------------
   const handleFileUpload = (file) => {
     setLoading(true);
@@ -1120,11 +1126,27 @@ export default function ExcelDashboard() {
 
             setData(normalizedData);
             
-            // Cập nhật danh sách filter từ dữ liệu mới
-            setListCreators([...new Set(normalizedData.map(i => i.nguoiTao))].sort());
-            setListStatuses([...new Set(normalizedData.map(i => i.trangThai))].filter(Boolean).sort());
-            setListExportTypes([...new Set(normalizedData.map(i => i.hinhThuc))].filter(Boolean).sort());
-            setListReturnStatuses([...new Set(normalizedData.map(i => i.traHang))].filter(Boolean).sort());
+            // --- 1. TÍNH TOÁN DANH SÁCH LỌC MỚI ---
+            const newCreators = [...new Set(normalizedData.map(i => i.nguoiTao))].sort();
+            const newStatuses = [...new Set(normalizedData.map(i => i.trangThai))].filter(Boolean).sort();
+            const newExportTypes = [...new Set(normalizedData.map(i => i.hinhThuc))].filter(Boolean).sort();
+            const newReturnStatuses = [...new Set(normalizedData.map(i => i.traHang))].filter(Boolean).sort();
+
+            // Cập nhật danh sách filter options
+            setListCreators(newCreators);
+            setListStatuses(newStatuses);
+            setListExportTypes(newExportTypes);
+            setListReturnStatuses(newReturnStatuses);
+            
+            // --- 2. BẢO TOÀN BỘ LỌC ĐÃ CHỌN (KHÔNG ĐẶT LẠI) ---
+            // Lọc bỏ các giá trị đã chọn không còn tồn tại trong file mới
+            setFilters(prevFilters => ({
+                ...prevFilters,
+                creators: prevFilters.creators.filter(c => newCreators.includes(c)),
+                statuses: prevFilters.statuses.filter(s => newStatuses.includes(s)),
+                exportTypes: prevFilters.exportTypes.filter(e => newExportTypes.includes(e)),
+                returnStatuses: prevFilters.returnStatuses.filter(r => newReturnStatuses.includes(r)),
+            }));
             
             setLastUpdate(moment().format("HH:mm DD/MM/YYYY"));
             message.success(`Đã tải lên ${normalizedData.length} dòng dữ liệu.`);
@@ -1144,7 +1166,7 @@ export default function ExcelDashboard() {
   };
 
   // ----------------------------------------
-  // DATA PROCESSING KERNEL (LOGIC XỬ LÝ & TÍNH TOÁN)
+  // DATA PROCESSING KERNEL (GIỮ NGUYÊN)
   // ----------------------------------------
   const processMainData = useCallback(() => {
     if (data.length === 0) return;
