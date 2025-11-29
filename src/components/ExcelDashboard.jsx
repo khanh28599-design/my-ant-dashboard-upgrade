@@ -34,12 +34,12 @@ const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
 // ==========================================
-// STYLES & HELPERS (GIỮ NGUYÊN)
+// STYLES & HELPERS (CẬP NHẬT STYLES CHUYÊN NGHIỆP)
 // ==========================================
 const cardStyle = {
   borderRadius: 12,
-  boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-  border: "none",
+  boxShadow: "0 6px 18px rgba(0,0,0,0.1)", // Shadow sâu hơn
+  border: "1px solid #e8e8e8", // Thêm viền nhẹ
   overflow: "hidden"
 };
 
@@ -49,6 +49,12 @@ const gradientText = {
   WebkitTextFillColor: "transparent",
   fontWeight: 800
 };
+
+// Định nghĩa màu sắc chủ đạo
+const PRIMARY_COLOR = '#1890ff';
+const SUCCESS_COLOR = '#52c41a';
+const ERROR_COLOR = '#f5222d';
+const WARNING_COLOR = '#faad14';
 
 const formatMoneyShort = (amount) => {
   if (!amount) return "0";
@@ -143,13 +149,21 @@ const captureTable = async (elementId, filename) => {
 };
 
 // ==========================================
-// COMPONENT BỘ LỌC TỔNG (GIỮ NGUYÊN)
+// COMPONENT BỘ LỌC TỔNG (ĐÃ CẬP NHẬT CHUYÊN NGHIỆP HƠN)
 // ==========================================
 
 function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters, setFilters, onReset }) {
   const handleChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
+
+  const QUICK_DATE_OPTIONS = [
+    { label: "Tất cả", value: "all" },
+    { label: "Hôm nay", value: "today" },
+    { label: "Tuần này", value: "this_week" },
+    { label: "Tháng này", value: "this_month" },
+    { label: "Tháng trước", value: "last_month" }
+  ];
 
   const handleTimeSelect = (value) => {
       let start, end;
@@ -165,68 +179,92 @@ function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters,
   };
 
   return (
-    <Card style={{ ...cardStyle, marginBottom: 20 }}>
-      <Row gutter={[16, 16]} align="middle" justify="start">
-        <Col span={3}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Người tạo</b></div>
+    <Card 
+        style={{ ...cardStyle, marginBottom: 20 }}
+        title={<span style={{color: PRIMARY_COLOR, fontWeight: 700}}><FilterFilled /> BỘ LỌC DỮ LIỆU TỔNG HỢP</span>}
+        extra={
+            <Button 
+                type="primary" 
+                danger 
+                icon={<ReloadOutlined />} 
+                onClick={onReset} 
+                size="large" 
+                style={{borderRadius: 6, fontWeight: 600}}
+            >
+                Đặt lại bộ lọc
+            </Button>
+        }
+    >
+      <Row gutter={[20, 16]} align="bottom" justify="start">
+
+        {/* 1. Người tạo */}
+        <Col xs={24} sm={12} md={6} lg={3}>
+          <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Người tạo</div>
           <Select 
             mode="multiple" allowClear placeholder="Chọn nhân viên..."
             value={filters.creators} onChange={(val) => handleChange('creators', val)}
-            size="middle" style={{ width: "100%" }} showSearch optionFilterProp="children" maxTagCount={1}
+            size="large" style={{ width: "100%" }} showSearch optionFilterProp="children" maxTagCount={1}
           >
             {creators.map(c => <Option key={c} value={c}>{c}</Option>)}
           </Select>
         </Col>
-        <Col span={3}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Trạng thái xuất</b></div>
+
+        {/* 2. Trạng thái xuất */}
+        <Col xs={24} sm={12} md={6} lg={3}>
+          <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Trạng thái xuất</div>
           <Select 
             mode="multiple" allowClear placeholder="Chọn trạng thái..."
             value={filters.statuses} onChange={(val) => handleChange('statuses', val)}
-            size="middle" style={{ width: "100%" }}
+            size="large" style={{ width: "100%" }}
           >
             {statuses.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
         </Col>
-        <Col span={3}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Hình thức xuất</b></div>
+
+        {/* 3. Hình thức xuất */}
+        <Col xs={24} sm={12} md={6} lg={4}>
+          <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Hình thức xuất</div>
           <Select 
             mode="multiple" allowClear placeholder="Chọn hình thức..."
             value={filters.exportTypes} onChange={(val) => handleChange('exportTypes', val)}
-            size="middle" style={{ width: "100%" }}
+            size="large" style={{ width: "100%" }} maxTagCount={1}
           >
             {exportTypes.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
         </Col>
-        <Col span={3}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Tình trạng nhập trả</b></div>
+
+        {/* 4. Tình trạng nhập trả */}
+        <Col xs={24} sm={12} md={6} lg={4}>
+          <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Tình trạng nhập trả</div>
           <Select 
             mode="multiple" allowClear placeholder="Chọn tình trạng..."
             value={filters.returnStatuses} onChange={(val) => handleChange('returnStatuses', val)}
-            size="middle" style={{ width: "100%" }}
+            size="large" style={{ width: "100%" }}
           >
             {returnStatuses.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
         </Col>
-        <Col span={4}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Khoảng thời gian</b></div>
-          <Select defaultValue="all" size="middle" style={{ width: "100%" }} onChange={handleTimeSelect}>
-            <Option value="all">Tất cả</Option>
-            <Option value="today">Hôm nay</Option>
-            <Option value="this_week">Tuần này</Option>
-            <Option value="this_month">Tháng này</Option>
-            <Option value="last_month">Tháng trước</Option>
-          </Select>
+
+        {/* 5. Lọc nhanh thời gian */}
+        <Col xs={24} sm={12} md={6} lg={4}>
+          <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Lọc nhanh thời gian</div>
+          <Select 
+            defaultValue="all" 
+            size="large" 
+            style={{ width: "100%" }} 
+            onChange={handleTimeSelect}
+            options={QUICK_DATE_OPTIONS}
+          />
         </Col>
-        <Col span={6}>
-          <div style={{color: "#666", marginBottom: 4}}><b>Từ ngày - Đến ngày</b></div>
+
+        {/* 6. Từ ngày - Đến ngày */}
+        <Col xs={24} sm={12} md={6} lg={6}>
+          <div style={{color: "#444", marginBottom: 4, fontWeight: 600}}>Từ ngày - Đến ngày</div>
           <RangePicker 
-            size="middle" style={{width: "100%"}} 
+            size="large" style={{width: "100%"}} 
             value={filters.dateRange} onChange={(dates) => handleChange('dateRange', dates)}
             format="DD/MM/YYYY"
           /> 
-        </Col>
-        <Col span={2}>
-          <Button type="dashed" icon={<ReloadOutlined />} size="middle" style={{marginTop: 24, width: "100%"}} onClick={onReset}>Xóa</Button>
         </Col>
       </Row>
     </Card>
@@ -297,14 +335,14 @@ function OverviewSection({ stats }) {
   );
 }
 
-// CẬP NHẬT: Biểu đồ cột thể hiện tỷ trọng Ngành hàng
+// Biểu đồ cột thể hiện tỷ trọng Ngành hàng
 function CategoryChartBar({ industryData, totalRevenue }) {
     // Chỉ lấy Ngành hàng (Parent) và sắp xếp theo DT
     const parentData = industryData.filter(i => !i.isChild).sort((a, b) => b.doanhThu - a.doanhThu).slice(0, 8);
     const colors = ["#1890ff", "#52c41a", "#faad14", "#722ed1", "#eb2f96", "#fadb14", "#13c2c2", "#fa541c"]; // Màu đơn sắc cho dễ nhìn
 
     return (
-        <Card style={cardStyle} title={<span style={{color: '#1890ff'}}><BarChartOutlined/> Tỷ trọng Ngành hàng (Top 8)</span>}>
+        <Card style={cardStyle} title={<span style={{color: PRIMARY_COLOR}}><BarChartOutlined/> Tỷ trọng Ngành hàng (Top 8)</span>}>
             <div style={{ height: 400, overflowY: 'auto', paddingRight: 10 }}>
                 {parentData.length > 0 ? parentData.map((item, index) => {
                     const percent = totalRevenue > 0 ? (item.doanhThu / totalRevenue) * 100 : 0;
@@ -334,7 +372,7 @@ function StaffHorizontalChart({ staffData }) {
   const sortedStaff = [...staffData].sort((a, b) => b.doanhThu - a.doanhThu).slice(0, 10);
   const maxRevenue = sortedStaff.length > 0 ? sortedStaff[0].doanhThu : 0;
   return (
-    <Card style={{ ...cardStyle, height: '100%' }} title={<span style={{color: '#1890ff'}}><TrophyOutlined /> Top 10 Doanh Thu NV</span>}>
+    <Card style={{ ...cardStyle, height: '100%' }} title={<span style={{color: PRIMARY_COLOR}}><TrophyOutlined /> Top 10 Doanh Thu NV</span>}>
       <div style={{ height: 400, overflowY: 'auto', paddingRight: 10 }}>
         {sortedStaff.map((staff, index) => {
           const percent = maxRevenue > 0 ? (staff.doanhThu / maxRevenue) * 100 : 0;
@@ -345,7 +383,7 @@ function StaffHorizontalChart({ staffData }) {
                  <span><Tag color="default" style={{borderColor: rankColor, color: index < 3 ? "#000" : "#666", background: index < 3 ? rankColor : "#fff"}}>#{index+1}</Tag> <b>{staff.name}</b></span>
                  <b>{formatMoneyShort(staff.doanhThu)}</b>
               </div>
-              <Progress percent={percent} showInfo={false} strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }} size="small" />
+              <Progress percent={percent} showInfo={false} strokeColor={{ '0%': PRIMARY_COLOR, '100%': SUCCESS_COLOR }} size="small" />
             </div>
           );
         })}
@@ -356,13 +394,13 @@ function StaffHorizontalChart({ staffData }) {
 }
 
 // ==========================================
-// CÁC BẢNG CHI TIẾT (ĐÃ CẬP NHẬT BỘ LỌC NGÀNH HÀNG)
+// CÁC BẢNG CHI TIẾT (ĐÃ CẬP NHẬT MÀU SẮC CHO BẢNG)
 // ==========================================
 
 function TopStaffRanking({ staffData, totalRevenue }) {
   const personalTarget = totalRevenue * 0.1;
   return (
-    <Card size="small" style={cardStyle} title={<b>Bảng Chi Tiết Nhân Viên</b>}>
+    <Card size="small" style={cardStyle} title={<b style={{color: PRIMARY_COLOR}}>Bảng Chi Tiết Nhân Viên</b>}>
       <Table
         dataSource={staffData}
         pagination={{ pageSize: 10 }}
@@ -371,26 +409,28 @@ function TopStaffRanking({ staffData, totalRevenue }) {
         scroll={{ x: 'max-content' }}
         style={{ fontSize: '12px' }}
         columns={[
-          {title: "#", render: (text, record, index) => index + 1, width: 50, align: 'center'},
-          {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: "#1890ff", fontSize: 12}}>{txt}</b>},
+          {title: "#", render: (text, record, index) => index + 1, width: 50, align: 'center', fixed: 'left'},
+          {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: PRIMARY_COLOR, fontSize: 12}}>{txt}</b>, fixed: 'left'},
           {title: "Doanh Thu Thực", dataIndex: "doanhThu", key: "doanhThu", render: val => formatMoneyShort(val), align: 'right', sorter: (a, b) => a.doanhThu - b.doanhThu},
-          {title: "Doanh Thu QĐ", dataIndex: "dtqd", key: "dtqd", render: val => <b style={{color: "#722ed1"}}>{formatMoneyShort(val)}</b>, align: 'right', sorter: (a, b) => a.dtqd - b.dtqd},
-          {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center', render: val => <Tag color={val >= 0 ? "success" : "error"}>{val > 0 ? '+' : ''}{val.toFixed(2)}%</Tag>, sorter: (a, b) => a.efficiency - b.efficiency},
-          {title: "% Mục Tiêu", key: "target", render: (_, record) => <Progress percent={personalTarget > 0 ? (record.doanhThu / personalTarget) * 100 : 0} size="small" steps={5} strokeColor="#52c41a" showInfo={false} />, align: 'center'},
+          {title: "Doanh Thu QĐ", dataIndex: "dtqd", key: "dtqd", render: val => <b style={{color: '#722ed1'}}>{formatMoneyShort(val)}</b>, align: 'right', sorter: (a, b) => a.dtqd - b.dtqd},
+          {title: "Hiệu quả", dataIndex: "efficiency", key: "efficiency", align: 'center', render: val => <Tag color={val >= 0 ? SUCCESS_COLOR : ERROR_COLOR}>{val > 0 ? '+' : ''}{val.toFixed(2)}%</Tag>, sorter: (a, b) => a.efficiency - b.efficiency},
+          {title: "% Mục Tiêu", key: "target", render: (_, record) => <Progress percent={personalTarget > 0 ? (record.doanhThu / personalTarget) * 100 : 0} size="small" steps={5} strokeColor={SUCCESS_COLOR} showInfo={false} />, align: 'center'},
           {title: "Bảo Hiểm", dataIndex: "bhRevenue", key: "bhRevenue", render: val => formatMoneyShort(val), align: 'right'},
         ]}
+        // Cập nhật style cho header và row
+        rowClassName={(record, index) => index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd'}
       />
     </Card>
   );
 }
 
-// CẬP NHẬT: Thêm bộ lọc ngành hàng vào đây
+// Bảng chi tiết Ngành hàng (Đã cập nhật màu sắc)
 function DetailIndustryTable({ industryData, totalRevenue }) {
     const [selectedIndustries, setSelectedIndustries] = useState([]);
     const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
     const [checkedList, setCheckedList] = useState(defaultCheckedList);
     
-    // Danh sách Ngành hàng + Nhóm hàng để tạo bộ lọc
+    // Danh sách Ngành hàng / Nhóm hàng để tạo bộ lọc
     const industryOptions = useMemo(() => {
         return industryData.flatMap(item => [item.name, ...(item.children || []).map(c => c.name)]).filter((value, index, self) => self.indexOf(value) === index).sort();
     }, [industryData]);
@@ -410,12 +450,10 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
                         children: childrenToInclude 
                     };
 
-                    // Nếu chỉ lọc con, ta cần tính lại tổng parent theo con đã lọc
-                    if(childrenToInclude.length > 0) {
+                    if(childrenToInclude.length > 0 && !isParentSelected) { 
                         newParent.soLuong = childrenToInclude.reduce((sum, item) => sum + item.soLuong, 0);
                         newParent.doanhThu = childrenToInclude.reduce((sum, item) => sum + item.doanhThu, 0);
                         newParent.dtqd = childrenToInclude.reduce((sum, item) => sum + item.dtqd, 0);
-                        // Đặt lại key để tránh trùng với key của tổng cộng
                         newParent.key = newParent.name + "_filtered"; 
                     }
                     
@@ -444,7 +482,6 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
         };
     }, [filteredIndustryData]);
 
-    // Combine parent and child data into a flat list for Ant Design Table's data source
     const dataSourceWithChildren = useMemo(() => {
         return filteredIndustryData.map(parent => ({
             ...parent,
@@ -458,8 +495,8 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
         { 
             title: "NGÀNH HÀNG / NHÓM HÀNG", dataIndex: "name", key: "name", width: 320, fixed: 'left',
             render: (text, record) => {
-                if (record.name === "TỔNG CỘNG") return <b style={{color: "#d9363e", fontSize: 13}}>{text}</b>;
-                return <span style={{fontWeight: record.isChild ? 400 : 700}}>{text}</span>
+                if (record.name === "TỔNG CỘNG") return <b style={{color: ERROR_COLOR, fontSize: 13}}>{text}</b>;
+                return <span style={{fontWeight: record.isChild ? 400 : 700, color: record.isChild ? '#444' : PRIMARY_COLOR}}>{text}</span>
             }
         },
         { 
@@ -468,11 +505,11 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
         },
         { 
             title: "DOANH THU THỰC", dataIndex: "doanhThu", key: "doanhThu", align: 'right', width: 150,
-            render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: "#d9363e", fontSize: 13}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
+            render: (val, record) => record.name === "TỔNG CỘNG" ? <b style={{color: ERROR_COLOR, fontSize: 13}}>{formatMoneyShort(val)}</b> : formatMoneyShort(val)
         },
         { 
             title: "DOANH THU QĐ", dataIndex: "dtqd", key: "dtqd", align: 'right', width: 150,
-            render: (val, record) => <b style={{color: "#1890ff"}}>{formatMoneyShort(val)}</b>
+            render: (val, record) => <b style={{color: '#722ed1'}}>{formatMoneyShort(val)}</b>
         },
         { 
             title: "HỆ SỐ", dataIndex: "coefficient", key: "coefficient", align: 'center', width: 110,
@@ -491,7 +528,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
             render: (_, record) => {
                 if(record.name === "TỔNG CỘNG") return "";
                 const eff = record.doanhThu > 0 ? ((record.dtqd - record.doanhThu)/record.doanhThu)*100 : 0;
-                const color = eff >= 0 ? "#52c41a" : "#f5222d";
+                const color = eff >= 0 ? SUCCESS_COLOR : ERROR_COLOR;
                 return <Tag color={color}>{eff > 0 ? '+' : ''}{eff.toFixed(1)}%</Tag>
             }
         },
@@ -499,9 +536,8 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
             title: "% ĐÓNG GÓP", key: "percent", width: 180,
             render: (_, record) => {
                 if(record.name === "TỔNG CỘNG") return "";
-                // Tính % đóng góp dựa trên tổng Doanh thu THỰC TOÀN BỘ (trước khi lọc ngành hàng)
                 const p = totalRevenue > 0 ? (record.doanhThu / totalRevenue) * 100 : 0;
-                return <div style={{display: 'flex', alignItems: 'center', gap: 8}}><span style={{width: 35, fontSize: 12}}>{p.toFixed(1)}%</span><Progress percent={p} showInfo={false} size="small" strokeColor="#1890ff" /></div>
+                return <div style={{display: 'flex', alignItems: 'center', gap: 8}}><span style={{width: 35, fontSize: 12}}>{p.toFixed(1)}%</span><Progress percent={p} showInfo={false} size="small" strokeColor={PRIMARY_COLOR} /></div>
             }
         }
     ];
@@ -520,7 +556,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
   return (
     <Card style={cardStyle}>
         <div style={{marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10}}>
-            <div style={{fontWeight: 'bold', fontSize: 16, color: '#1890ff'}}>
+            <div style={{fontWeight: 'bold', fontSize: 16, color: PRIMARY_COLOR}}>
                 <TableOutlined /> CHI TIẾT NGÀNH HÀNG & NHÓM HÀNG
             </div>
             
@@ -550,11 +586,38 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
             bordered 
             expandable={{defaultExpandAllRows: false}}
             style={{ fontSize: '12px' }}
+            // Thêm style cho các hàng quan trọng (Hàng tổng cộng)
+            rowClassName={(record, index) => record.name === "TỔNG CỘNG" ? 'summary-row' : ''}
         />
+        {/* Thêm style CSS để làm đẹp bảng */}
+        <style jsx global>{`
+            .ant-table-wrapper {
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .ant-table-thead > tr > th {
+                background-color: #f0f5ff !important; /* Màu xanh nhạt cho header */
+                color: ${PRIMARY_COLOR} !important;
+                font-weight: 700;
+                text-transform: uppercase;
+                border-bottom: 2px solid ${PRIMARY_COLOR};
+            }
+            .ant-table-row-even {
+                background-color: #f9f9f9;
+            }
+            .summary-row {
+                background-color: #fff1f0 !important; /* Màu đỏ nhạt cho hàng tổng cộng */
+                font-weight: bold;
+            }
+            .summary-row td {
+                border-top: 2px solid ${ERROR_COLOR} !important;
+            }
+        `}</style>
     </Card>
   );
 }
 
+// Bảng đơn giá trung bình (Đã cập nhật màu sắc)
 function StaffAvgPriceTable({ rawData }) {
   const targetGroups = [
     { id: "1094", name: "Tivi LED (1094)", target: 9000000 },
@@ -608,7 +671,7 @@ function StaffAvgPriceTable({ rawData }) {
   const columns = [
     {
       title: "Nhân Viên", dataIndex: "name", key: "name", fixed: "left", width: 180,
-      render: text => <b style={{ color: "#1890ff", fontSize: 12 }}>{text}</b>
+      render: text => <b style={{ color: PRIMARY_COLOR, fontSize: 12 }}>{text}</b>
     },
     ...visibleGroups.map(group => ({
       title: (
@@ -623,7 +686,7 @@ function StaffAvgPriceTable({ rawData }) {
         if (!price || price === 0) return <span style={{ color: "#eee" }}>-</span>;
         
         const isPass = price >= group.target;
-        const color = isPass ? "#52c41a" : "#f5222d";
+        const color = isPass ? SUCCESS_COLOR : ERROR_COLOR;
         
         return (
           <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
@@ -640,7 +703,7 @@ function StaffAvgPriceTable({ rawData }) {
   return (
     <Card style={cardStyle} bodyStyle={{paddingTop: 10}}>
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
-          <div style={{fontSize: 16, fontWeight: 'bold', color: '#1890ff'}}><DollarOutlined /> Đơn Giá Trung Bình</div>
+          <div style={{fontSize: 16, fontWeight: 'bold', color: PRIMARY_COLOR}}><DollarOutlined /> Đơn Giá Trung Bình</div>
           <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
               <FilterFilled style={{color: '#888'}} />
               <span style={{fontSize: 13, color: '#555'}}>Lọc nhóm:</span>
@@ -658,8 +721,8 @@ function StaffAvgPriceTable({ rawData }) {
           </div>
       </div>
       <div style={{marginBottom: 10, fontSize: 12, color: '#666', display: 'flex', gap: 15}}>
-          <span><Tag color="#52c41a">Xanh</Tag> Đạt mục tiêu</span>
-          <span><Tag color="#f5222d">Đỏ</Tag> Thấp hơn mục tiêu</span>
+          <span><Tag color={SUCCESS_COLOR}>Xanh</Tag> Đạt mục tiêu</span>
+          <span><Tag color={ERROR_COLOR}>Đỏ</Tag> Thấp hơn mục tiêu</span>
       </div>
       <Table
         dataSource={dataSource} 
@@ -669,11 +732,13 @@ function StaffAvgPriceTable({ rawData }) {
         bordered 
         size="small" 
         style={{ fontSize: '12px' }}
+         rowClassName={(record, index) => index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd'}
       />
     </Card>
   );
 }
 
+// Bảng thi đua (Đã cập nhật màu sắc)
 function CompetitionTable() {
     const [rawDataInput, setRawDataInput] = useState("");
     const [tableData, setTableData] = useState([]);
@@ -717,9 +782,9 @@ function CompetitionTable() {
         const headers = headerLine.split(/[\t]|\s{2,}/).map(h => h.trim().toLowerCase().replace(/[^a-z0-9%]/g, ''));
         
         const nameKeywords = ['nganhhang', 'ten', 'nhom', 'mat hang'];
-        const thucHienKeywords = ['dtqd', 'dtlk', 'thuchien', 'datduoc', 'sl', 'sllk']; 
-        const targetKeywords = ['target', 'muctieu', 'mt'];
-        const percentKeywords = ['%htdukien', '%hoanthanh'];
+        const thucHienKeywords = ['dtqd', 'dtlk', 'thuchien', 'datduoc', 'sl', 'sllk', 'thực hiện']; 
+        const targetKeywords = ['target', 'muctieu', 'mt', 'mục tiêu'];
+        const percentKeywords = ['%htdukien', '%hoanthanh', '%'];
 
         const indices = {};
         
@@ -817,7 +882,7 @@ function CompetitionTable() {
     };
 
     const columns = [
-        { title: "Tên / Đơn vị", dataIndex: "name", key: "name", width: 200, fixed: 'left', render: text => <b>{text}</b> },
+        { title: "Tên / Đơn vị", dataIndex: "name", key: "name", width: 200, fixed: 'left', render: text => <b style={{color: PRIMARY_COLOR}}>{text}</b> },
         { 
             title: "Mục Tiêu", dataIndex: "target", key: "target", align: 'right', width: 120,
             render: val => formatMoneyShort(val),
@@ -825,13 +890,13 @@ function CompetitionTable() {
         },
         { 
             title: "Thực Hiện", dataIndex: "actual", key: "actual", align: 'right', width: 120,
-            render: val => <b style={{color: '#1890ff'}}>{formatMoneyShort(val)}</b>,
+            render: val => <b style={{color: '#722ed1'}}>{formatMoneyShort(val)}</b>,
             sorter: (a, b) => a.actual - b.actual
         },
         {
             title: "Tiến Độ", dataIndex: "percent", key: "percent", align: 'center', width: 180,
             render: (val, record) => {
-                const color = val >= 100 ? "#52c41a" : val >= 80 ? "#faad14" : "#f5222d";
+                const color = val >= 100 ? SUCCESS_COLOR : val >= 80 ? WARNING_COLOR : ERROR_COLOR;
                 return (
                     <Tooltip title={`Còn lại: ${formatMoneyShort(record.remaining)}`}>
                         <Progress percent={val} strokeColor={color} format={p => `${p.toFixed(1)}%`} />
@@ -842,7 +907,7 @@ function CompetitionTable() {
         },
         {
             title: "Còn Lại", dataIndex: "remaining", key: "remaining", align: 'right', width: 120,
-            render: val => val > 0 ? <span style={{color: '#f5222d'}}>{formatMoneyShort(val)}</span> : <Tag color="success">Về đích</Tag>,
+            render: val => val > 0 ? <span style={{color: ERROR_COLOR}}>{formatMoneyShort(val)}</span> : <Tag color="success">Về đích</Tag>,
             sorter: (a, b) => a.remaining - b.remaining
         },
         {
@@ -868,17 +933,17 @@ function CompetitionTable() {
                             showUploadList={false} 
                             accept="image/*"
                         >
-                            <Button icon={<ScanOutlined />} loading={ocrLoading}>
+                            <Button type="dashed" icon={<ScanOutlined />} loading={ocrLoading}>
                                 {ocrLoading ? `Đang quét (${ocrProgress}%)` : "Scan từ ảnh"}
                             </Button>
                         </Upload>
                         <Button type="primary" onClick={processData} icon={<ArrowDownOutlined />}>Phân Tích</Button>
-                        <Button onClick={() => setRawDataInput("")}>Xóa</Button>
+                        <Button onClick={() => setRawDataInput("")} type="default">Xóa</Button>
                     </div>
                 </Col>
                 <Col span={12}>
-                     <div style={{background: '#f0f5ff', padding: 15, borderRadius: 8, height: '100%'}}>
-                        <b><InfoCircleOutlined /> Hướng dẫn:</b>
+                     <div style={{background: '#f0f5ff', border: `1px solid ${PRIMARY_COLOR}`, padding: 15, borderRadius: 8, height: '100%'}}>
+                        <b><InfoCircleOutlined style={{color: PRIMARY_COLOR}} /> Hướng dẫn:</b>
                         <ul style={{marginTop: 5, paddingLeft: 20, fontSize: 13, color: '#555'}}>
                             <li><b>Cách 1:</b> Copy bảng từ Excel hoặc Zalo PC dán vào ô bên trái.</li>
                             <li><b>Cách 2:</b> Bấm "Scan từ ảnh" để chụp màn hình bảng số liệu.</li>
@@ -902,6 +967,8 @@ function CompetitionTable() {
                     rowKey="key" 
                     pagination={false} 
                     scroll={{ x: 800, y: 500 }}
+                    size="small"
+                    rowClassName={(record, index) => index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd'}
                     summary={pageData => {
                         let totalTarget = 0;
                         let totalActual = 0;
@@ -913,12 +980,12 @@ function CompetitionTable() {
                         const totalRemaining = totalTarget - totalActual;
 
                         return (
-                            <Table.Summary.Row style={{background: '#fafafa', fontWeight: 'bold'}}>
-                                <Table.Summary.Cell index={0}>TỔNG CỘNG</Table.Summary.Cell>
+                            <Table.Summary.Row className="summary-row">
+                                <Table.Summary.Cell index={0}><b style={{color: ERROR_COLOR}}>TỔNG CỘNG</b></Table.Summary.Cell>
                                 <Table.Summary.Cell index={1} align="right">{formatMoneyShort(totalTarget)}</Table.Summary.Cell>
-                                <Table.Summary.Cell index={2} align="right">{formatMoneyShort(totalActual)}</Table.Summary.Cell>
-                                <Table.Summary.Cell index={3} align="center"><Tag color="blue">{totalPercent.toFixed(1)}%</Tag></Table.Summary.Cell>
-                                <Table.Summary.Cell index={4} align="right">{formatMoneyShort(totalRemaining)}</Table.Summary.Cell>
+                                <Table.Summary.Cell index={2} align="right"><b style={{color: '#722ed1'}}>{formatMoneyShort(totalActual)}</b></Table.Summary.Cell>
+                                <Table.Summary.Cell index={3} align="center"><Tag color={PRIMARY_COLOR}>{totalPercent.toFixed(1)}%</Tag></Table.Summary.Cell>
+                                <Table.Summary.Cell index={4} align="right"><b style={{color: ERROR_COLOR}}>{formatMoneyShort(totalRemaining)}</b></Table.Summary.Cell>
                                 <Table.Summary.Cell index={5}></Table.Summary.Cell>
                             </Table.Summary.Row>
                         );
@@ -930,7 +997,7 @@ function CompetitionTable() {
 }
 
 // ==========================================
-// 5. MAIN APP COMPONENT
+// 5. MAIN APP COMPONENT (GIỮ NGUYÊN LOGIC)
 // ==========================================
 
 export default function ExcelDashboard() {
