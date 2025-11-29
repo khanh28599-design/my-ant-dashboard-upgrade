@@ -69,14 +69,18 @@ const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", 
 
 const ALLOWED_EXPORT_TYPES = [
     "Xuất bán ưu đãi cho nhân viên",
+    "Xuất bán pre-order tại siêu thị",
     "Xuất đổi bảo hành sản phẩm IMEI",
-    "Xuất đổi bảo hành sản phẩm trả góp",
+    "Xuất sử dụng gói đổi trả hàng dùng thử",
+    "Xuất đổi bảo hành sản phẩm trả góp có IMEI",
     "Xuất bán hàng tại siêu thị",
     "Xuất bán hàng trả góp tại siêu thị",
     "Xuất SIM trắng kèm theo SIM",
     "Xuất dịch vụ thu hộ bảo hiểm",
     "Xuất dịch vụ bảo hành trọn đời",
     "Xuất đổi bảo hành tại siêu thị",
+    "Xuất cung ứng dịch vụ bảo dưỡng trọn đời",
+    "Xuất dịch vụ bảo dưỡng trọn đời"
 ];
 
 const isAllowedProduct = (industryStr, groupStr) => {
@@ -293,27 +297,34 @@ function OverviewSection({ stats }) {
   );
 }
 
+// CẬP NHẬT: Biểu đồ cột thể hiện tỷ trọng Ngành hàng
 function CategoryChartBar({ industryData, totalRevenue }) {
-    const parentData = industryData.filter(i => !i.isChild).sort((a, b) => b.doanhThu - a.doanhThu);
-    const colors = ["linear-gradient(to right, #2980b9, #6dd5fa)", "linear-gradient(to right, #11998e, #38ef7d)", "linear-gradient(to right, #f12711, #f5af19)", "linear-gradient(to right, #8e44ad, #c39bd3)", "linear-gradient(to right, #F37335, #FDC830)", "linear-gradient(to right, #00b09b, #96c93d)"];
+    // Chỉ lấy Ngành hàng (Parent) và sắp xếp theo DT
+    const parentData = industryData.filter(i => !i.isChild).sort((a, b) => b.doanhThu - a.doanhThu).slice(0, 8);
+    const colors = ["#1890ff", "#52c41a", "#faad14", "#722ed1", "#eb2f96", "#fadb14", "#13c2c2", "#fa541c"]; // Màu đơn sắc cho dễ nhìn
 
     return (
-        <Card style={cardStyle} title={<span style={{color: '#1890ff'}}><BarChartOutlined/> Tỷ trọng ngành hàng</span>}>
-            <div style={{ display: "flex", gap: 16, overflowX: 'auto', paddingBottom: 10 }}>
+        <Card style={cardStyle} title={<span style={{color: '#1890ff'}}><BarChartOutlined/> Tỷ trọng Ngành hàng (Top 8)</span>}>
+            <div style={{ height: 400, overflowY: 'auto', paddingRight: 10 }}>
                 {parentData.length > 0 ? parentData.map((item, index) => {
                     const percent = totalRevenue > 0 ? (item.doanhThu / totalRevenue) * 100 : 0;
-                    const bg = colors[index % colors.length];
+                    const color = colors[index % colors.length];
                     return (
-                        <div key={item.key} style={{minWidth: 110, background: "#f9f9f9", padding: 10, borderRadius: 8, border: "1px solid #eee"}}>
-                            <b style={{fontSize: 12, color: "#555"}}>{item.name.includes("-") ? item.name.split("-")[1] : item.name}</b>
-                            <div style={{fontSize: 14, fontWeight: 'bold', margin: "4px 0", color: "#333"}}>{formatMoneyShort(item.doanhThu)}</div>
-                            <div style={{ height: 8, width: "100%", background: "#e8e8e8", borderRadius: 4, overflow: 'hidden'}}>
-                                <div style={{ height: '100%', width: `${percent}%`, background: bg }}></div>
+                        <div key={item.key} style={{marginBottom: 16}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13}}>
+                                <span><Tag color={color} style={{fontWeight: 'bold', fontSize: 11}}>{(item.name.split(' - ')[0] || "---").trim()}</Tag> <b>{item.name.includes("-") ? item.name.split("-")[1] : item.name}</b></span>
+                                <b>{formatMoneyShort(item.doanhThu)}</b>
                             </div>
-                            <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>{percent.toFixed(1)}%</div>
+                            <Progress 
+                                percent={percent} 
+                                showInfo={true} 
+                                size="small" 
+                                strokeColor={color} 
+                                format={p => <span style={{fontSize: 11}}>{p.toFixed(1)}%</span>}
+                            />
                         </div>
                     )
-                }) : <div style={{padding: 20, color: '#999'}}>Không có dữ liệu</div>}
+                }) : <div style={{padding: 20, color: '#999'}}>Không có dữ liệu Ngành hàng</div>}
             </div>
         </Card>
     );
@@ -323,7 +334,7 @@ function StaffHorizontalChart({ staffData }) {
   const sortedStaff = [...staffData].sort((a, b) => b.doanhThu - a.doanhThu).slice(0, 10);
   const maxRevenue = sortedStaff.length > 0 ? sortedStaff[0].doanhThu : 0;
   return (
-    <Card style={{ ...cardStyle, height: '100%' }} title={<span style={{color: '#1890ff'}}><TrophyOutlined /> Top 10 Doanh Thu</span>}>
+    <Card style={{ ...cardStyle, height: '100%' }} title={<span style={{color: '#1890ff'}}><TrophyOutlined /> Top 10 Doanh Thu NV</span>}>
       <div style={{ height: 400, overflowY: 'auto', paddingRight: 10 }}>
         {sortedStaff.map((staff, index) => {
           const percent = maxRevenue > 0 ? (staff.doanhThu / maxRevenue) * 100 : 0;
@@ -345,7 +356,7 @@ function StaffHorizontalChart({ staffData }) {
 }
 
 // ==========================================
-// CÁC BẢNG CHI TIẾT (GIỮ NGUYÊN)
+// CÁC BẢNG CHI TIẾT (ĐÃ CẬP NHẬT BỘ LỌC NGÀNH HÀNG)
 // ==========================================
 
 function TopStaffRanking({ staffData, totalRevenue }) {
@@ -373,11 +384,13 @@ function TopStaffRanking({ staffData, totalRevenue }) {
   );
 }
 
+// CẬP NHẬT: Thêm bộ lọc ngành hàng vào đây
 function DetailIndustryTable({ industryData, totalRevenue }) {
     const [selectedIndustries, setSelectedIndustries] = useState([]);
     const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
     const [checkedList, setCheckedList] = useState(defaultCheckedList);
     
+    // Danh sách Ngành hàng + Nhóm hàng để tạo bộ lọc
     const industryOptions = useMemo(() => {
         return industryData.flatMap(item => [item.name, ...(item.children || []).map(c => c.name)]).filter((value, index, self) => self.indexOf(value) === index).sort();
     }, [industryData]);
@@ -390,8 +403,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
                 const isParentSelected = selectedIndustries.includes(parent.name);
 
                 if (isParentSelected || filteredChildren.length > 0) {
-                    // Nếu parent được chọn hoặc có ít nhất 1 child được chọn, ta phải tính lại tổng cho parent
-                    const childrenToInclude = isParentSelected ? parent.children : filteredChildren;
+                    const childrenToInclude = (parent.children || []).filter(child => isParentSelected || selectedIndustries.includes(child.name));
                     
                     const newParent = { 
                         ...parent, 
@@ -399,10 +411,12 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
                     };
 
                     // Nếu chỉ lọc con, ta cần tính lại tổng parent theo con đã lọc
-                    if(!isParentSelected && filteredChildren.length > 0) {
-                        newParent.soLuong = filteredChildren.reduce((sum, item) => sum + item.soLuong, 0);
-                        newParent.doanhThu = filteredChildren.reduce((sum, item) => sum + item.doanhThu, 0);
-                        newParent.dtqd = filteredChildren.reduce((sum, item) => sum + item.dtqd, 0);
+                    if(childrenToInclude.length > 0) {
+                        newParent.soLuong = childrenToInclude.reduce((sum, item) => sum + item.soLuong, 0);
+                        newParent.doanhThu = childrenToInclude.reduce((sum, item) => sum + item.doanhThu, 0);
+                        newParent.dtqd = childrenToInclude.reduce((sum, item) => sum + item.dtqd, 0);
+                        // Đặt lại key để tránh trùng với key của tổng cộng
+                        newParent.key = newParent.name + "_filtered"; 
                     }
                     
                     return newParent;
@@ -414,10 +428,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
 
 
     const totalRow = useMemo(() => {
-        const allItems = filteredIndustryData.flatMap(parent => [parent, ...(parent.children || [])]);
-        
-        const total = allItems.reduce((acc, item) => {
-            if (item.isChild) return acc; // Chỉ tính Parent
+        const total = filteredIndustryData.reduce((acc, item) => {
             return {
                 soLuong: acc.soLuong + item.soLuong,
                 doanhThu: acc.doanhThu + item.doanhThu,
@@ -488,6 +499,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
             title: "% ĐÓNG GÓP", key: "percent", width: 180,
             render: (_, record) => {
                 if(record.name === "TỔNG CỘNG") return "";
+                // Tính % đóng góp dựa trên tổng Doanh thu THỰC TOÀN BỘ (trước khi lọc ngành hàng)
                 const p = totalRevenue > 0 ? (record.doanhThu / totalRevenue) * 100 : 0;
                 return <div style={{display: 'flex', alignItems: 'center', gap: 8}}><span style={{width: 35, fontSize: 12}}>{p.toFixed(1)}%</span><Progress percent={p} showInfo={false} size="small" strokeColor="#1890ff" /></div>
             }
@@ -972,7 +984,7 @@ export default function ExcelDashboard() {
   };
 
   // ----------------------------------------
-  // FILE HANDLING (CẬP NHẬT: AUTO MAP CỘT THEO YÊU CẦU MỚI)
+  // FILE HANDLING 
   // ----------------------------------------
   const handleFileUpload = (file) => {
     setLoading(true);
@@ -990,20 +1002,16 @@ export default function ExcelDashboard() {
         // Giả sử dòng đầu tiên là header
         const headers = rawData[0].map(h => String(h)); 
         
-        // --- SMART MAPPING CONFIG (ĐÃ CẬP NHẬT THEO YÊU CẦU CỦA BẠN) ---
+        // --- SMART MAPPING CONFIG ---
         const mapConfig = {
-            // Priority 1: Exact/Close match from user's file. Priority 2: Generic keywords.
             nguoiTao: ['Người tạo', 'nhân viên', 'sales', 'tên nv', 'staff', 'nguoi tao'],
             trangThai: ['Trạng thái xuất', 'trạng thái', 'status', 'tình trạng', 'trang thai'],
             hinhThuc: ['Hình thức xuất', 'hình thức', 'loại xuất', 'type', 'hinh thuc'],
-            // Column full name: "Tình trạng nhập trả của sản phẩm đổi với sản phẩm chính"
             traHang: ['Tình trạng nhập trả của sản phẩm đổi với sản phẩm chính', 'tình trạng trả', 'nhập trả', 'trả hàng', 'return', 'tra hang'],
             nganhHang: ['Ngành hàng', 'ngành hàng', 'industry', 'ngành', 'nganh hang'],
             nhomHang: ['Nhóm hàng', 'nhóm hàng', 'group', 'nhóm', 'nhom hang'],
-            // Sử dụng "Ngày tạo" cho việc lọc thời gian
             ngayChungTu: ['Ngày tạo', 'ngày chứng từ', 'ngày', 'date', 'ngay chung tu', 'ngày hạch toán'], 
             soLuong: ['Số lượng', 'sl', 'qty', 'quantity', 'so luong'],
-            // Sử dụng "Giá bán" làm doanh thu (do đây là file chi tiết)
             doanhThu: ['Giá bán', 'Giá bán_1', 'Phải thu', 'Đã thu', 'tổng tiền thanh toán', 'doanh thu', 'thành tiền', 'tổng tiền', 'amount', 'doanh thu thực', 'tiền']
         };
 
@@ -1031,16 +1039,15 @@ export default function ExcelDashboard() {
 
                 return {
                     key: index,
-                    // CÁC CỘT ĐÃ ĐƯỢC MAP THEO YÊU CẦU CỦA BẠN
                     nguoiTao: getVal('nguoiTao') || "Unknown",
                     trangThai: getVal('trangThai'),
                     hinhThuc: getVal('hinhThuc'),
                     traHang: getVal('traHang'),
                     nganhHang: getVal('nganhHang'),
                     nhomHang: getVal('nhomHang'),
-                    ngayChungTu: getVal('ngayChungTu'), // Dùng cho việc lọc thời gian
+                    ngayChungTu: getVal('ngayChungTu'), 
                     soLuong: sl,
-                    doanhThu: dt, // Dùng cho các công thức tính toán
+                    doanhThu: dt, 
                 };
             });
 
@@ -1055,7 +1062,6 @@ export default function ExcelDashboard() {
             setLastUpdate(moment().format("HH:mm DD/MM/YYYY"));
             message.success(`Đã tải lên ${normalizedData.length} dòng dữ liệu.`);
             
-            // Thông báo nếu thiếu cột quan trọng
             if(!colMap.doanhThu) message.warning("Không tìm thấy cột 'Giá bán/Doanh thu'. Dữ liệu sẽ sai lệch.");
             if(!colMap.nguoiTao) message.warning("Không tìm thấy cột 'Người tạo/Nhân viên'.");
         }
@@ -1071,7 +1077,7 @@ export default function ExcelDashboard() {
   };
 
   // ----------------------------------------
-  // DATA PROCESSING KERNEL (GIỮ NGUYÊN)
+  // DATA PROCESSING KERNEL (LOGIC XỬ LÝ & TÍNH TOÁN)
   // ----------------------------------------
   const processMainData = useCallback(() => {
     if (data.length === 0) return;
@@ -1089,10 +1095,8 @@ export default function ExcelDashboard() {
             const start = filters.dateRange[0].startOf('day');
             const end = filters.dateRange[1].endOf('day');
             result = result.filter(r => {
-                // Xử lý ngày tháng Excel (có thể là chuỗi hoặc serial number)
                 let d;
                 if (typeof r.ngayChungTu === 'number') {
-                    // Excel date serial number to JS Date
                     d = moment(new Date((r.ngayChungTu - (25567 + 2)) * 86400 * 1000));
                 } else {
                     d = moment(r.ngayChungTu, ["DD/MM/YYYY", "YYYY-MM-DD", "DD-MM-YYYY", moment.ISO_8601]);
@@ -1106,16 +1110,14 @@ export default function ExcelDashboard() {
         let totalConverted = 0;
         let totalInstallment = 0;
         
-        const indMap = {}; // Map lưu Ngành hàng (Parent)
+        const indMap = {}; 
         const staffMap = {}; 
 
         result.forEach(row => {
-            // -- LOGIC CỐT LÕI: Tính toán từng dòng (đại diện cho một giao dịch thuộc Nhóm hàng) --
             
             const isInstallment = row.hinhThuc && row.hinhThuc.toLowerCase().includes("trả góp");
             const isInsurance = row.nganhHang && (row.nganhHang.includes("164") || row.nganhHang.toLowerCase().includes("bảo hiểm"));
 
-            // Tính hệ số cho dòng này
             let coef = 1.0;
             if (isAllowedProduct(row.nganhHang, row.nhomHang) || ALLOWED_EXPORT_TYPES.includes(row.hinhThuc)) {
                  coef = getConversionCoefficient(row.nganhHang, row.nhomHang);
@@ -1132,7 +1134,6 @@ export default function ExcelDashboard() {
             const industryName = row.nganhHang || "Khác";
             const groupName = row.nhomHang || "Chưa phân nhóm";
 
-            // Tạo Parent (Ngành hàng) nếu chưa có
             if (!indMap[industryName]) {
                 indMap[industryName] = { 
                     key: industryName, 
@@ -1141,15 +1142,13 @@ export default function ExcelDashboard() {
                     doanhThu: 0, 
                     dtqd: 0, 
                     isChild: false, 
-                    children: {} // Dùng object để map children (nhóm hàng) duy nhất
+                    children: {}
                 };
             }
-            // Cộng dồn vào Parent (Doanh thu Ngành hàng = Tổng doanh thu các nhóm con)
             indMap[industryName].soLuong += row.soLuong;
             indMap[industryName].doanhThu += row.doanhThu;
             indMap[industryName].dtqd += convertedVal;
 
-            // Tạo Child (Nhóm hàng) nếu chưa có trong Parent đó
             if (!indMap[industryName].children[groupName]) {
                 indMap[industryName].children[groupName] = {
                     key: `${industryName}-${groupName}`,
@@ -1161,13 +1160,12 @@ export default function ExcelDashboard() {
                     coefficient: coef
                 };
             }
-            // Cộng dồn vào Child
             indMap[industryName].children[groupName].soLuong += row.soLuong;
             indMap[industryName].children[groupName].doanhThu += row.doanhThu;
             indMap[industryName].children[groupName].dtqd += convertedVal;
 
 
-            // --- TỔNG HỢP THEO NHÂN VIÊN (Doanh thu nhân viên = Tổng các nhóm hàng họ bán) ---
+            // --- TỔNG HỢP THEO NHÂN VIÊN ---
             const sName = row.nguoiTao;
             if (!staffMap[sName]) {
                 staffMap[sName] = { key: sName, name: sName, doanhThu: 0, dtqd: 0, bhRevenue: 0 };
@@ -1190,11 +1188,10 @@ export default function ExcelDashboard() {
         });
 
         // 4. Transform Maps to Arrays for Tables
-        // Chuyển đổi indMap thành mảng, và convert children object thành mảng children
         const indArray = Object.values(indMap).map(parent => ({
             ...parent,
-            children: Object.values(parent.children).sort((a,b) => b.doanhThu - a.doanhThu) // Sort nhóm hàng theo doanh thu
-        })).sort((a,b) => b.doanhThu - a.doanhThu); // Sort ngành hàng theo doanh thu
+            children: Object.values(parent.children).sort((a,b) => b.doanhThu - a.doanhThu)
+        })).sort((a,b) => b.doanhThu - a.doanhThu);
 
         const stfArray = Object.values(staffMap).map(s => ({
             ...s,
@@ -1237,7 +1234,7 @@ export default function ExcelDashboard() {
         <Col>
            <Space>
              <Upload 
-                accept=".xlsx, .xls, .csv" // Thêm .csv để hỗ trợ file bạn gửi
+                accept=".xlsx, .xls, .csv" 
                 showUploadList={false} 
                 beforeUpload={handleFileUpload}
              >
@@ -1266,11 +1263,12 @@ export default function ExcelDashboard() {
             <TabPane tab={<span><AppstoreOutlined /> Tổng Quan</span>} key="1">
                 <OverviewSection stats={stats} />
 
+                {/* THAY ĐỔI: Sử dụng Biểu đồ cột Ngành hàng (CategoryChartBar) */}
                 <Row gutter={20} style={{marginBottom: 20}}>
-                    <Col span={16}>
+                    <Col span={12}>
                         <CategoryChartBar industryData={industryData} totalRevenue={stats.totalRevenue} />
                     </Col>
-                    <Col span={8}>
+                    <Col span={12}>
                         <StaffHorizontalChart staffData={staffData} />
                     </Col>
                 </Row>
@@ -1284,7 +1282,6 @@ export default function ExcelDashboard() {
                     
                     <Row gutter={20} style={{marginBottom: 20}}>
                         <Col span={24}>
-                            {/* Table này đã được cập nhật để hiển thị cấu trúc cha-con: Ngành hàng -> Nhóm hàng */}
                             <DetailIndustryTable 
                                 industryData={industryData} 
                                 totalRevenue={stats.totalRevenue} 
