@@ -68,10 +68,10 @@ const formatMoneyShort = (amount) => {
 };
 
 // ==========================================
-// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH (GIỮ NGUYÊN)
+// CORE LOGIC: HỆ SỐ & HÀM CHỤP HÌNH (ĐÃ CẬP NHẬT HỆ SỐ QUY ĐỔI)
 // ==========================================
 
-const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664"];
+const ALLOWED_IDS = ["1034", "1116", "1214", "1274", "13", "1394", "16", "164", "1754", "1755", "1756", "184", "22", "23", "244", "304", "484", "664", "42", "1094"];
 
 const ALLOWED_EXPORT_TYPES = [
     "Xuất bán ưu đãi cho nhân viên",
@@ -100,13 +100,23 @@ const getConversionCoefficient = (industryStr, groupStr) => {
     
     const str = (groupStr || industryStr || "").toLowerCase();
 
+    // === CẬP NHẬT HỆ SỐ THEO YÊU CẦU TRƯỚC ===
+    // Tivi LED (ID 1094) = 1.2
+    if (iID === "1094") return 1.20; 
+    
+    // Laptop (ID 1274 hoặc ID 42) = 1.2 
+    if (iID === "1274" || iID === "42") return 1.20; 
+    // ========================================
+
     if (iID === "664" || str.includes("sim")) return 5.45;
     if (iID === "164" || str.includes("bảo hiểm")) {
-        if (gID === "4479" || str.includes("bảo hiểm")) return 4.18;
+        // gID 4479 là nhóm hàng bảo hiểm cụ thể có hệ số 4.18 (đã giữ nguyên)
+        if (gID === "4479" || str.includes("bảo hiểm")) return 4.18; 
         return 1.0;
     }
     if (["16", "184", "1394"].includes(iID)) return 3.37;
-    if (["1274", "23"].includes(iID)) return 3.00;
+    // ID 23 giữ nguyên 3.00
+    if (iID === "23") return 3.00; 
     if (iID === "1034") return 1.92;
     if (iID === "1116") {
         if (gID === "4171") return 1.85;
@@ -149,7 +159,7 @@ const captureTable = async (elementId, filename) => {
 };
 
 // ==========================================
-// COMPONENT BỘ LỌC TỔNG (CẬP NHẬT: THÊM CHỌN TẤT CẢ)
+// CÁC COMPONENT KHÁC (GIỮ NGUYÊN)
 // ==========================================
 
 function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters, setFilters, onReset }) {
@@ -277,10 +287,6 @@ function FilterPanel({ creators, statuses, exportTypes, returnStatuses, filters,
   );
 }
 
-// ==========================================
-// CÁC COMPONENT KHÁC (GIỮ NGUYÊN)
-// ==========================================
-
 function OverviewSection({ stats }) {
   const EffIcon = stats.conversionEfficiency >= 0 ? ArrowUpOutlined : ArrowDownOutlined;
 
@@ -400,13 +406,45 @@ function StaffHorizontalChart({ staffData }) {
 }
 
 // ==========================================
-// CÁC BẢNG CHI TIẾT (GIỮ NGUYÊN)
+// CÁC BẢNG CHI TIẾT (GIỮ NGUYÊN CẤU TRÚC, CỘT BH ĐÃ ĐƯỢC THÊM TRONG LẦN SỬA TRƯỚC)
 // ==========================================
 
 function TopStaffRanking({ staffData, totalRevenue }) {
   const personalTarget = totalRevenue * 0.1;
+
+  // Cấu hình cột chi tiết (dùng cho expandable row)
+  const expandedColumns = [
+    {title: "Nhóm Hàng", dataIndex: "groupName", key: "groupName", render: txt => <span>{txt}</span>, width: 250},
+    {title: "Hệ Số QĐ", dataIndex: "coefficient", key: "coefficient", align: 'center', width: 80, render: val => <Tag color="purple">{val}</Tag>},
+    {title: "DT Thực (Nhóm)", dataIndex: "doanhThu", key: "groupDoanhThu", render: val => formatMoneyShort(val), align: 'right'},
+    {title: "DT QĐ (Nhóm)", dataIndex: "dtqd", key: "groupDtqd", render: val => <b style={{color: '#722ed1'}}>{formatMoneyShort(val)}</b>, align: 'right'},
+    // Cột Bảo hiểm chi tiết theo nhóm hàng (Đã thêm từ lần sửa trước)
+    {title: "Bảo hiểm (Nhóm)", dataIndex: "bhRevenue", key: "groupBhRevenue", render: val => <Tag color="volcano" style={{fontWeight: 700}}>{formatMoneyShort(val)}</Tag>, align: 'right'},
+  ];
+
+  // Hàm render chi tiết nhóm hàng khi mở rộng
+  const renderGroupDetail = (record) => {
+    if (!record.children || record.children.length === 0) return <div>Không có dữ liệu nhóm hàng chi tiết.</div>;
+    
+    return (
+        <div style={{ padding: '10px 0 10px 40px', background: '#f5f5f5' }}>
+             <div style={{fontWeight: 'bold', marginBottom: 5, color: PRIMARY_COLOR}}>CHI TIẾT THEO NHÓM HÀNG:</div>
+             <Table
+                columns={expandedColumns}
+                dataSource={record.children}
+                pagination={false}
+                size="small"
+                rowKey={(r) => r.groupName}
+                style={{width: '100%'}}
+                showHeader={false}
+                bordered={false}
+             />
+        </div>
+    );
+  };
+    
   return (
-    <Card size="small" style={cardStyle} title={<b style={{color: PRIMARY_COLOR}}>Bảng Chi Tiết Nhân Viên</b>}>
+    <Card size="small" style={cardStyle} title={<b style={{color: PRIMARY_COLOR}}>Bảng Chi Tiết Nhân Viên (Nhấn vào hàng để xem chi tiết Nhóm hàng)</b>}>
       <Table
         dataSource={staffData}
         pagination={{ pageSize: 10 }}
@@ -414,6 +452,11 @@ function TopStaffRanking({ staffData, totalRevenue }) {
         rowKey="key"
         scroll={{ x: 'max-content' }}
         style={{ fontSize: '12px' }}
+        // BỔ SUNG: Cho phép mở rộng hàng để hiển thị chi tiết Nhóm hàng
+        expandable={{
+            expandedRowRender: renderGroupDetail,
+            rowExpandable: record => record.children && record.children.length > 0,
+        }}
         columns={[
           {title: "#", render: (text, record, index) => index + 1, width: 50, align: 'center', fixed: 'left'},
           {title: "Nhân Viên", dataIndex: "name", key: "name", render: txt => <b style={{color: PRIMARY_COLOR, fontSize: 12}}>{txt}</b>, fixed: 'left'},
@@ -423,14 +466,12 @@ function TopStaffRanking({ staffData, totalRevenue }) {
           {title: "% Mục Tiêu", key: "target", render: (_, record) => <Progress percent={personalTarget > 0 ? (record.doanhThu / personalTarget) * 100 : 0} size="small" steps={5} strokeColor={SUCCESS_COLOR} showInfo={false} />, align: 'center'},
           {title: "Bảo Hiểm", dataIndex: "bhRevenue", key: "bhRevenue", render: val => formatMoneyShort(val), align: 'right'},
         ]}
-        // Cập nhật style cho header và row
         rowClassName={(record, index) => index % 2 === 0 ? 'ant-table-row-even' : 'ant-table-row-odd'}
       />
     </Card>
   );
 }
 
-// Bảng chi tiết Ngành hàng (Giữ nguyên)
 function DetailIndustryTable({ industryData, totalRevenue }) {
     const [selectedIndustries, setSelectedIndustries] = useState([]);
     const defaultCheckedList = ['soLuong', 'doanhThu', 'dtqd', 'coefficient', 'unitPrice', 'efficiency', 'percent'];
@@ -592,7 +633,7 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
             bordered 
             expandable={{defaultExpandAllRows: false}}
             style={{ fontSize: '12px' }}
-            // Thêm style cho các hàng quan trọng (Hàng tổng cộng)
+            // Thêm style CSS để làm đẹp bảng
             rowClassName={(record, index) => record.name === "TỔNG CỘNG" ? 'summary-row' : ''}
         />
         {/* Thêm style CSS để làm đẹp bảng */}
@@ -623,7 +664,6 @@ function DetailIndustryTable({ industryData, totalRevenue }) {
   );
 }
 
-// Bảng đơn giá trung bình (Giữ nguyên)
 function StaffAvgPriceTable({ rawData }) {
   const targetGroups = [
     { id: "1094", name: "Tivi LED (1094)", target: 9000000 },
@@ -744,7 +784,6 @@ function StaffAvgPriceTable({ rawData }) {
   );
 }
 
-// Bảng thi đua (Giữ nguyên)
 function CompetitionTable() {
     const [rawDataInput, setRawDataInput] = useState("");
     const [tableData, setTableData] = useState([]);
@@ -757,6 +796,7 @@ function CompetitionTable() {
 
     const tableRef = useRef(null);
     
+    // Tesseract được định nghĩa bên ngoài hàm này
     const handleImageUpload = (file) => {
         setOcrLoading(true);
         setOcrProgress(0);
@@ -1003,7 +1043,7 @@ function CompetitionTable() {
 }
 
 // ==========================================
-// 5. MAIN APP COMPONENT (CẬP NHẬT LOGIC LỌC KHI LOAD FILE)
+// 5. MAIN APP COMPONENT (ĐÃ CẬP NHẬT LOGIC TÍNH BH)
 // ==========================================
 
 export default function ExcelDashboard() {
@@ -1057,7 +1097,7 @@ export default function ExcelDashboard() {
   };
 
   // ----------------------------------------
-  // FILE HANDLING (CẬP NHẬT: THÊM LOGIC BẢO TOÀN LỰA CHỌN FILTER)
+  // FILE HANDLING (GIỮ NGUYÊN LOGIC)
   // ----------------------------------------
   const handleFileUpload = (file) => {
     setLoading(true);
@@ -1077,7 +1117,8 @@ export default function ExcelDashboard() {
         
         // --- SMART MAPPING CONFIG ---
         const mapConfig = {
-            nguoiTao: ['Người tạo', 'nhân viên', 'sales', 'tên nv', 'staff', 'nguoi tao'],
+            // Đặt các tiêu đề có trong file của bạn lên đầu để ưu tiên (như hướng dẫn trước)
+            nguoiTao: ['Người tạo', 'Tên nhân viên giao hàng', 'nhân viên', 'sales', 'tên nv', 'staff', 'nguoi tao'],
             trangThai: ['Trạng thái xuất', 'trạng thái', 'status', 'tình trạng', 'trang thai'],
             hinhThuc: ['Hình thức xuất', 'hình thức', 'loại xuất', 'type', 'hinh thuc'],
             traHang: ['Tình trạng nhập trả của sản phẩm đổi với sản phẩm chính', 'tình trạng trả', 'nhập trả', 'trả hàng', 'return', 'tra hang'],
@@ -1085,7 +1126,7 @@ export default function ExcelDashboard() {
             nhomHang: ['Nhóm hàng', 'nhóm hàng', 'group', 'nhóm', 'nhom hang'],
             ngayChungTu: ['Ngày tạo', 'ngày chứng từ', 'ngày', 'date', 'ngay chung tu', 'ngày hạch toán'], 
             soLuong: ['Số lượng', 'sl', 'qty', 'quantity', 'so luong'],
-            doanhThu: ['Giá bán', 'Giá bán_1', 'Phải thu', 'Đã thu', 'tổng tiền thanh toán', 'doanh thu', 'thành tiền', 'tổng tiền', 'amount', 'doanh thu thực', 'tiền']
+            doanhThu: ['Giá bán_1', 'Phải thu', 'Giá bán', 'Đã thu', 'tổng tiền thanh toán', 'doanh thu', 'thành tiền', 'tổng tiền', 'amount', 'doanh thu thực', 'tiền']
         };
 
         const colMap = {};
@@ -1138,8 +1179,7 @@ export default function ExcelDashboard() {
             setListExportTypes(newExportTypes);
             setListReturnStatuses(newReturnStatuses);
             
-            // --- 2. BẢO TOÀN BỘ LỌC ĐÃ CHỌN (KHÔNG ĐẶT LẠI) ---
-            // Lọc bỏ các giá trị đã chọn không còn tồn tại trong file mới
+            // --- 2. BẢO TOÀN BỘ LỌC ĐÃ CHỌN ---
             setFilters(prevFilters => ({
                 ...prevFilters,
                 creators: prevFilters.creators.filter(c => newCreators.includes(c)),
@@ -1166,7 +1206,7 @@ export default function ExcelDashboard() {
   };
 
   // ----------------------------------------
-  // DATA PROCESSING KERNEL (GIỮ NGUYÊN)
+  // DATA PROCESSING KERNEL (CẬP NHẬT LOGIC TÍNH BH THEO NHÓM HÀNG 4479, 4499)
   // ----------------------------------------
   const processMainData = useCallback(() => {
     if (data.length === 0) return;
@@ -1205,7 +1245,10 @@ export default function ExcelDashboard() {
         result.forEach(row => {
             
             const isInstallment = row.hinhThuc && row.hinhThuc.toLowerCase().includes("trả góp");
-            const isInsurance = row.nganhHang && (row.nganhHang.includes("164") || row.nganhHang.toLowerCase().includes("bảo hiểm"));
+            
+            // XÁC ĐỊNH NHÓM HÀNG ĐỂ TÍNH DOANH THU BẢO HIỂM (MỚI)
+            const groupID = row.nhomHang ? row.nhomHang.toString().split(" - ")[0].trim() : "";
+            const isBhRevenueGroup = groupID === "4479" || groupID === "4499"; 
 
             let coef = 1.0;
             if (isAllowedProduct(row.nganhHang, row.nhomHang) || ALLOWED_EXPORT_TYPES.includes(row.hinhThuc)) {
@@ -1219,7 +1262,7 @@ export default function ExcelDashboard() {
             totalConverted += convertedVal;
             if (isInstallment) totalInstallment += row.doanhThu;
 
-            // --- TỔNG HỢP THEO CẤU TRÚC: NGÀNH HÀNG -> NHÓM HÀNG ---
+            // --- TỔNG HỢP THEO CẤU TRÚC: NGÀNH HÀNG -> NHÓM HÀNG (GIỮ NGUYÊN) ---
             const industryName = row.nganhHang || "Khác";
             const groupName = row.nhomHang || "Chưa phân nhóm";
 
@@ -1254,14 +1297,43 @@ export default function ExcelDashboard() {
             indMap[industryName].children[groupName].dtqd += convertedVal;
 
 
-            // --- TỔNG HỢP THEO NHÂN VIÊN ---
+            // --- CẬP NHẬT: TỔNG HỢP THEO NHÂN VIÊN (ĐÃ CẬP NHẬT ĐIỀU KIỆN BH) ---
             const sName = row.nguoiTao;
+            
             if (!staffMap[sName]) {
-                staffMap[sName] = { key: sName, name: sName, doanhThu: 0, dtqd: 0, bhRevenue: 0 };
+                staffMap[sName] = { 
+                    key: sName, 
+                    name: sName, 
+                    doanhThu: 0, 
+                    dtqd: 0, 
+                    bhRevenue: 0, 
+                    groups: {} // LƯU TRỮ CHI TIẾT NHÓM HÀNG
+                };
             }
+            // Cập nhật tổng Bảo hiểm cho Nhân viên (BHRevenue của main row) theo nhóm 4479, 4499
+            if (isBhRevenueGroup) staffMap[sName].bhRevenue += row.doanhThu; 
+
+            // Tổng Doanh thu cho Nhân viên (main row)
             staffMap[sName].doanhThu += row.doanhThu;
             staffMap[sName].dtqd += convertedVal;
-            if (isInsurance) staffMap[sName].bhRevenue += row.doanhThu;
+            
+            // Aggregation by Group (Nhóm hàng) for Staff Detail
+            if (!staffMap[sName].groups[groupName]) {
+                 staffMap[sName].groups[groupName] = {
+                     groupName: groupName,
+                     doanhThu: 0,
+                     dtqd: 0,
+                     coefficient: coef,
+                     bhRevenue: 0 // Khởi tạo BH Revenue cho nhóm hàng
+                 };
+            }
+            staffMap[sName].groups[groupName].doanhThu += row.doanhThu;
+            staffMap[sName].groups[groupName].dtqd += convertedVal;
+            
+            // Cộng dồn Bảo hiểm cho Nhóm hàng theo nhóm 4479, 4499
+            if (isBhRevenueGroup) { 
+                 staffMap[sName].groups[groupName].bhRevenue += row.doanhThu;
+            }
         });
 
         // 3. Finalize Stats
@@ -1284,7 +1356,9 @@ export default function ExcelDashboard() {
 
         const stfArray = Object.values(staffMap).map(s => ({
             ...s,
-            efficiency: s.doanhThu > 0 ? ((s.dtqd - s.doanhThu) / s.doanhThu) * 100 : 0
+            efficiency: s.doanhThu > 0 ? ((s.dtqd - s.doanhThu) / s.doanhThu) * 100 : 0,
+            // Chuyển groups map thành array, sắp xếp theo DT để hiển thị trong expandable row
+            children: Object.values(s.groups).sort((a,b) => b.doanhThu - a.doanhThu) 
         })).sort((a,b) => b.doanhThu - a.doanhThu);
 
         setFilteredData(result);
@@ -1380,6 +1454,7 @@ export default function ExcelDashboard() {
 
                     <Row gutter={20}>
                         <Col span={24}>
+                            {/* Bảng Chi Tiết Nhân Viên */}
                             <TopStaffRanking staffData={staffData} totalRevenue={stats.totalRevenue} />
                         </Col>
                     </Row>
